@@ -8,6 +8,9 @@ const Login: React.FC = () => {
   const [isSignup, setIsSignup] = useState(false);
   const [email, setEmail] = useState('');
   
+  // Secret access state
+  const [isSecretVisible, setIsSecretVisible] = useState(false);
+
   // Signup State
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<UserRole>(UserRole.WORKER);
@@ -21,6 +24,21 @@ const Login: React.FC = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+
+  // Check for secret hash on mount and hash change
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === '#platform-vault') {
+        setIsSecretVisible(true);
+      } else {
+        setIsSecretVisible(false);
+      }
+    };
+
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, []);
 
   useEffect(() => {
     let interval: any;
@@ -37,36 +55,29 @@ const Login: React.FC = () => {
 
   const startVerification = (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real app, this would trigger an API call to send an OTP
     setIsVerifying(true);
     setResendTimer(60);
   };
 
   const handleGoogleAuth = () => {
     setIsGoogleLoading(true);
-    // Simulate Google OAuth Redirect/Popup
     setTimeout(() => {
       setIsGoogleLoading(false);
       setIsSignup(true);
       setEmail('verified.google.user@gmail.com');
       setFullName('Google User');
-      // Google users are pre-verified
       setIsVerifying(false); 
-      // Note: In this simulated flow, we still let them fill church details
     }, 1500);
   };
 
   const handleCompleteSignup = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Check if code is valid (Simulated: 123456 is the "magic" code)
     if (verificationCode !== '123456' && !email.includes('google')) {
       alert("Invalid verification code. Please use 123456 for this demo.");
       return;
     }
 
     let churchId = selectedChurchId;
-
     if (role === UserRole.CHURCH_ADMIN) {
       const church = addChurch({
         name: newChurchName,
@@ -211,7 +222,7 @@ const Login: React.FC = () => {
                     type="email" 
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@church.com"
+                    placeholder="admin@church.com"
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
                   />
                 </div>
@@ -314,7 +325,7 @@ const Login: React.FC = () => {
                   type="email" 
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="pastor@grace.com"
+                  placeholder="admin@grace.com"
                   className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 focus:outline-none transition-all text-lg font-bold"
                 />
               </div>
@@ -328,24 +339,35 @@ const Login: React.FC = () => {
 
               <div className="pt-6 border-t border-slate-100">
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Or click to simulate login</p>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   {[
-                    { role: 'Pastor', email: 'pastor@grace.com' },
-                    { role: 'Head', email: 'sarah@grace.com' },
+                    { role: 'Admin', email: 'pastor@grace.com' },
+                    { role: 'Unit Head', email: 'sarah@grace.com' },
                     { role: 'Worker', email: 'david@grace.com' },
-                    { role: 'Owner', email: 'platform@ecclesia.com' },
                   ].map(opt => (
                     <button 
                       key={opt.email}
                       type="button"
                       onClick={() => setEmail(opt.email)}
-                      className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[9px] font-black text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition-all text-center uppercase"
+                      className="px-2 py-3 bg-slate-50 border border-slate-200 rounded-xl text-[9px] font-black text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition-all text-center uppercase"
                     >
                       {opt.role}
                     </button>
                   ))}
                 </div>
               </div>
+
+              {isSecretVisible && (
+                <div className="pt-6 mt-6 border-t-2 border-dashed border-indigo-100 animate-in slide-in-from-top-4 duration-500">
+                  <button 
+                    type="button"
+                    onClick={() => setEmail('platform@ecclesia.com')}
+                    className="w-full py-4 bg-indigo-950 text-indigo-400 border border-indigo-900 rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-indigo-900 hover:text-white transition-all shadow-2xl shadow-indigo-200/50"
+                  >
+                    ✨ Master Platform Access
+                  </button>
+                </div>
+              )}
             </form>
           )}
 

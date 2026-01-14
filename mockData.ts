@@ -8,7 +8,7 @@ export const MOCK_CHURCHES = [
 
 export const MOCK_USERS = [
   { id: 'u1', churchId: 'all', fullName: 'Super Admin', email: 'platform@ecclesia.com', role: UserRole.PLATFORM_OWNER, status: 'APPROVED' },
-  { id: 'u2', churchId: 'c1', fullName: 'Pastor John Doe', email: 'pastor@grace.com', role: UserRole.CHURCH_ADMIN, status: 'APPROVED', dateOfBirth: '1980-05-15' },
+  { id: 'u2', churchId: 'c1', fullName: 'Admin John Doe', email: 'pastor@grace.com', role: UserRole.CHURCH_ADMIN, status: 'APPROVED', dateOfBirth: '1980-05-15' },
   { id: 'u3', churchId: 'c1', fullName: 'Sarah Smith', email: 'sarah@grace.com', role: UserRole.UNIT_HEAD, unitId: 'un1', status: 'APPROVED' },
   { id: 'u4', churchId: 'c1', fullName: 'David King', email: 'david@grace.com', role: UserRole.WORKER, unitId: 'un1', status: 'APPROVED', dateOfBirth: '1995-12-01' },
   { id: 'u5', churchId: 'c1', fullName: 'New Worker', email: 'new@grace.com', role: UserRole.WORKER, unitId: 'un2', status: 'PENDING' },
