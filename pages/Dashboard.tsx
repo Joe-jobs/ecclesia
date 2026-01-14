@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../store';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { TaskStatus, UserRole } from '../types';
 
 const Dashboard: React.FC = () => {
-  const { currentUser, attendance, firstTimers, tasks, announcements, events, users } = useApp();
+  const { currentUser, currentChurch, attendance, firstTimers, tasks, announcements, events, users, approveUser } = useApp();
+  const [copied, setCopied] = useState(false);
 
   const churchAttendance = attendance.filter(a => a.churchId === currentUser?.churchId);
   const pendingTasks = tasks.filter(t => t.assignedTo === currentUser?.id && t.status !== TaskStatus.DONE);
@@ -18,6 +19,14 @@ const Dashboard: React.FC = () => {
     { label: 'Active Tasks', value: pendingTasks.length, color: 'text-orange-600', bg: 'bg-orange-50' },
     { label: 'Upcoming Events', value: events.length, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
+
+  const handleCopyLink = () => {
+    if (!currentChurch) return;
+    const link = `${window.location.origin}${window.location.pathname}#join-worker?churchId=${currentChurch.id}`;
+    navigator.clipboard.writeText(link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div className="space-y-6">
@@ -53,28 +62,48 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Pending Approvals (Admin Only) */}
+        {/* Worker Management (Admin Only) */}
         {currentUser?.role === UserRole.CHURCH_ADMIN && (
-          <div className="bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
-            <h3 className="text-base lg:text-lg font-bold text-slate-800 mb-4">Worker Approvals</h3>
-            {pendingApprovals.length > 0 ? (
-              <div className="space-y-3 overflow-y-auto max-h-[300px] lg:max-h-none">
-                {pendingApprovals.map(user => (
-                  <div key={user.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div className="min-w-0 flex-1 mr-2">
-                      <p className="text-sm font-bold text-slate-800 truncate">{user.fullName}</p>
-                      <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+          <div className="space-y-6">
+            {/* Invite Link Card */}
+            <div className="bg-indigo-900 p-6 rounded-2xl shadow-xl text-white">
+              <h3 className="text-sm font-black uppercase tracking-widest mb-2">Worker Onboarding</h3>
+              <p className="text-xs text-indigo-200 mb-4">Share this link with new workers to allow them to register for your church units.</p>
+              <button 
+                onClick={handleCopyLink}
+                className={`w-full py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${copied ? 'bg-emerald-500 text-white' : 'bg-white text-indigo-900 hover:bg-indigo-50'}`}
+              >
+                {copied ? '✓ Link Copied' : '📋 Copy Invite Link'}
+              </button>
+            </div>
+
+            {/* Pending Approvals */}
+            <div className="bg-white p-4 lg:p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col">
+              <h3 className="text-base lg:text-lg font-bold text-slate-800 mb-4">Pending Approvals</h3>
+              {pendingApprovals.length > 0 ? (
+                <div className="space-y-3 overflow-y-auto max-h-[300px]">
+                  {pendingApprovals.map(user => (
+                    <div key={user.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="min-w-0 flex-1 mr-2">
+                        <p className="text-sm font-bold text-slate-800 truncate">{user.fullName}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
+                      </div>
+                      <button 
+                        onClick={() => approveUser(user.id)}
+                        className="shrink-0 text-[10px] font-black bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 transition-colors uppercase tracking-widest"
+                      >
+                        Approve
+                      </button>
                     </div>
-                    <button className="shrink-0 text-[10px] font-bold bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700">Approve</button>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
-                <span className="text-3xl mb-2">✅</span>
-                <p className="text-xs font-medium">No pending workers.</p>
-              </div>
-            )}
+                  ))}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-slate-400 py-8">
+                  <span className="text-3xl mb-2">✅</span>
+                  <p className="text-xs font-medium uppercase tracking-widest">No pending workers.</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 

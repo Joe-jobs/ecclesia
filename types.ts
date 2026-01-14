@@ -37,10 +37,14 @@ export enum Priority {
 export interface Church {
   id: string;
   name: string;
-  location: string;
+  city: string;
+  state: string;
+  country: string;
+  phone: string;
+  location: string; // Concatenated legacy field
   adminId: string;
   createdAt: string;
-  currency?: Currency; // New: Currency setting for the church
+  currency?: Currency;
 }
 
 export interface User {

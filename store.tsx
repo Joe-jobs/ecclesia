@@ -6,7 +6,6 @@ import {
 } from './types';
 import * as Mocks from './mockData';
 
-// Mock Exchange Rates relative to 1 USD
 export const EXCHANGE_RATES: Record<Currency, number> = {
   [Currency.USD]: 1,
   [Currency.NGN]: 1500,
@@ -33,7 +32,7 @@ interface AppContextProps extends AppState {
   login: (email: string) => void;
   logout: () => void;
   registerUser: (user: Omit<User, 'id'>) => User;
-  addChurch: (church: Omit<Church, 'id' | 'createdAt'>) => Church;
+  addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location'>) => Church;
   setCurrentChurchId: (id: string) => void;
   updateUser: (user: Partial<User>) => void;
   approveUser: (userId: string) => void;
@@ -69,7 +68,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return {
       currentUser: null,
       currentChurch: null,
-      churches: Mocks.MOCK_CHURCHES.map(c => ({ ...c, currency: Currency.USD })),
+      churches: Mocks.MOCK_CHURCHES.map(c => ({ 
+        ...c, 
+        currency: Currency.USD,
+        city: c.location.split(', ')[0] || '',
+        state: c.location.split(', ')[1] || '',
+        country: 'Nigeria', // Mock default
+        phone: '+234 000 000 0000' // Mock default
+      })),
       users: Mocks.MOCK_USERS as any,
       units: Mocks.MOCK_UNITS,
       firstTimers: Mocks.MOCK_FIRST_TIMERS as any,
@@ -99,11 +105,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setState(prev => ({ ...prev, currentUser: null, currentChurch: null }));
   };
 
-  const addChurch = (churchData: Omit<Church, 'id' | 'createdAt'>) => {
+  const addChurch = (churchData: Omit<Church, 'id' | 'createdAt' | 'location'>) => {
     const newChurch: Church = {
       ...churchData,
       id: 'c-' + Math.random().toString(36).substr(2, 9),
       createdAt: new Date().toISOString().split('T')[0],
+      location: `${churchData.city}, ${churchData.state}`,
       currency: Currency.USD
     };
     setState(prev => ({
