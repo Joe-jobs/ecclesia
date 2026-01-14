@@ -1,0 +1,366 @@
+
+import React, { useState, useEffect } from 'react';
+import { useApp } from '../store';
+import { UserRole } from '../types';
+
+const Login: React.FC = () => {
+  const { login, registerUser, addChurch, churches, units } = useApp();
+  const [isSignup, setIsSignup] = useState(false);
+  const [email, setEmail] = useState('');
+  
+  // Signup State
+  const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState<UserRole>(UserRole.WORKER);
+  const [selectedChurchId, setSelectedChurchId] = useState('');
+  const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [newChurchName, setNewChurchName] = useState('');
+  const [newChurchLocation, setNewChurchLocation] = useState('');
+
+  // Verification State
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let interval: any;
+    if (resendTimer > 0) {
+      interval = setInterval(() => setResendTimer(prev => prev - 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [resendTimer]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    login(email);
+  };
+
+  const startVerification = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, this would trigger an API call to send an OTP
+    setIsVerifying(true);
+    setResendTimer(60);
+  };
+
+  const handleGoogleAuth = () => {
+    setIsGoogleLoading(true);
+    // Simulate Google OAuth Redirect/Popup
+    setTimeout(() => {
+      setIsGoogleLoading(false);
+      setIsSignup(true);
+      setEmail('verified.google.user@gmail.com');
+      setFullName('Google User');
+      // Google users are pre-verified
+      setIsVerifying(false); 
+      // Note: In this simulated flow, we still let them fill church details
+    }, 1500);
+  };
+
+  const handleCompleteSignup = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Check if code is valid (Simulated: 123456 is the "magic" code)
+    if (verificationCode !== '123456' && !email.includes('google')) {
+      alert("Invalid verification code. Please use 123456 for this demo.");
+      return;
+    }
+
+    let churchId = selectedChurchId;
+
+    if (role === UserRole.CHURCH_ADMIN) {
+      const church = addChurch({
+        name: newChurchName,
+        location: newChurchLocation,
+        adminId: 'pending',
+      });
+      churchId = church.id;
+    }
+
+    registerUser({
+      churchId,
+      fullName,
+      email,
+      role,
+      unitId: role === UserRole.WORKER ? selectedUnitId : undefined,
+      status: role === UserRole.CHURCH_ADMIN ? 'APPROVED' : 'PENDING'
+    });
+
+    login(email);
+  };
+
+  const availableUnits = units.filter(u => u.churchId === selectedChurchId);
+
+  if (isVerifying) {
+    return (
+      <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 lg:p-12 animate-in zoom-in-95 duration-300">
+          <div className="text-center mb-8">
+            <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <span className="text-4xl">📧</span>
+            </div>
+            <h2 className="text-2xl font-black text-slate-800 mb-2">Verify your email</h2>
+            <p className="text-sm text-slate-500">
+              We've sent a code to <span className="font-bold text-indigo-600">{email}</span>. 
+              Enter it below to continue.
+            </p>
+          </div>
+
+          <form onSubmit={handleCompleteSignup} className="space-y-6">
+            <div>
+              <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest text-center">6-Digit Verification Code</label>
+              <input 
+                required
+                type="text" 
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="0 0 0 0 0 0"
+                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:outline-none transition-all text-3xl font-black text-center tracking-[0.5em]"
+              />
+              <p className="text-center text-[10px] text-slate-400 mt-2 italic">Tip: Use 123456 for the demo</p>
+            </div>
+
+            <button 
+              type="submit"
+              className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all text-sm uppercase tracking-widest"
+            >
+              Verify & Create Account
+            </button>
+
+            <div className="text-center">
+              <button 
+                type="button"
+                disabled={resendTimer > 0}
+                onClick={() => setResendTimer(60)}
+                className={`text-xs font-black uppercase tracking-widest transition-colors ${resendTimer > 0 ? 'text-slate-300' : 'text-indigo-600 hover:text-indigo-800'}`}
+              >
+                {resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend Code'}
+              </button>
+            </div>
+            
+            <button 
+              type="button"
+              onClick={() => setIsVerifying(false)}
+              className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
+            >
+              ← Back to Details
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4 lg:p-12 overflow-y-auto">
+      <div className="bg-white rounded-[2rem] lg:rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
+        <div className="bg-indigo-900 p-8 lg:p-12 text-center text-white relative">
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full lg:hidden"></div>
+          <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tighter">Ecclesia</h1>
+          <p className="text-indigo-200 text-sm lg:text-base opacity-80 uppercase tracking-widest font-bold">
+            {isSignup ? 'Join our community' : 'Church Management System'}
+          </p>
+        </div>
+        
+        <div className="p-8 lg:p-12">
+          {/* Third Party Auth */}
+          <div className="mb-8">
+            <button 
+              onClick={handleGoogleAuth}
+              disabled={isGoogleLoading}
+              className="w-full flex items-center justify-center gap-3 py-4 border-2 border-slate-100 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition-all relative"
+            >
+              {isGoogleLoading ? (
+                <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  <span>Continue with Google</span>
+                </>
+              )}
+            </button>
+            <div className="relative mt-8 mb-4">
+              <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
+              <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300">Or use email</span></div>
+            </div>
+          </div>
+
+          {isSignup ? (
+            <form onSubmit={startVerification} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Full Name</label>
+                  <input 
+                    required
+                    type="text" 
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter full name"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Email Address</label>
+                  <input 
+                    required
+                    type="email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="name@church.com"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Account Type</label>
+                <div className="grid grid-cols-2 gap-3 p-1 bg-slate-100 rounded-2xl">
+                  <button 
+                    type="button"
+                    onClick={() => setRole(UserRole.CHURCH_ADMIN)}
+                    className={`py-3 rounded-xl text-xs font-black transition-all ${role === UserRole.CHURCH_ADMIN ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    CHURCH ADMIN
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setRole(UserRole.WORKER)}
+                    className={`py-3 rounded-xl text-xs font-black transition-all ${role === UserRole.WORKER ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                  >
+                    CHURCH WORKER
+                  </button>
+                </div>
+              </div>
+
+              {role === UserRole.CHURCH_ADMIN ? (
+                <div className="space-y-5 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 animate-in zoom-in-95 duration-300">
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Register Your Church</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Church Name</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={newChurchName}
+                        onChange={(e) => setNewChurchName(e.target.value)}
+                        placeholder="Grace Chapel..."
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Location</label>
+                      <input 
+                        required
+                        type="text" 
+                        value={newChurchLocation}
+                        onChange={(e) => setNewChurchLocation(e.target.value)}
+                        placeholder="City, State"
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-5 p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100 animate-in zoom-in-95 duration-300">
+                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Select Your Church & Unit</p>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Church</label>
+                      <select 
+                        required
+                        value={selectedChurchId}
+                        onChange={(e) => setSelectedChurchId(e.target.value)}
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold"
+                      >
+                        <option value="">Select Church</option>
+                        {churches.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Unit</label>
+                      <select 
+                        required
+                        disabled={!selectedChurchId}
+                        value={selectedUnitId}
+                        onChange={(e) => setSelectedUnitId(e.target.value)}
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold disabled:opacity-50"
+                      >
+                        <option value="">Select Unit</option>
+                        {availableUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em]"
+              >
+                Send Verification Code
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-[0.2em]">Registered Email</label>
+                <input 
+                  required
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="pastor@grace.com"
+                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 focus:outline-none transition-all text-lg font-bold"
+                />
+              </div>
+              
+              <button 
+                type="submit"
+                className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em]"
+              >
+                Enter Portal
+              </button>
+
+              <div className="pt-6 border-t border-slate-100">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4 text-center">Or click to simulate login</p>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                  {[
+                    { role: 'Pastor', email: 'pastor@grace.com' },
+                    { role: 'Head', email: 'sarah@grace.com' },
+                    { role: 'Worker', email: 'david@grace.com' },
+                    { role: 'Owner', email: 'platform@ecclesia.com' },
+                  ].map(opt => (
+                    <button 
+                      key={opt.email}
+                      type="button"
+                      onClick={() => setEmail(opt.email)}
+                      className="px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[9px] font-black text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition-all text-center uppercase"
+                    >
+                      {opt.role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </form>
+          )}
+
+          <div className="mt-8 text-center">
+            <button 
+              onClick={() => setIsSignup(!isSignup)}
+              className="text-xs font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors"
+            >
+              {isSignup ? 'Already have an account? Login' : "New to Ecclesia? Join here"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Login;
