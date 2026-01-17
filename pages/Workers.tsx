@@ -60,21 +60,21 @@ const Workers: React.FC = () => {
       {/* Metrics Bar */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 lg:gap-6">
         <div className="bg-white p-6 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-6">
-          <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl">👥</div>
+          <div className="w-14 h-14 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">👥</div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Staff</p>
             <h4 className="text-2xl font-black text-slate-900">{stats.total}</h4>
           </div>
         </div>
         <div className="bg-white p-6 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-6">
-          <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl">⚡</div>
+          <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">⚡</div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Active Now</p>
             <h4 className="text-2xl font-black text-slate-900">{stats.active}</h4>
           </div>
         </div>
         <div className="bg-white p-6 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex items-center gap-6">
-          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl">⏳</div>
+          <div className="w-14 h-14 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center text-2xl shrink-0">⏳</div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pending</p>
             <h4 className="text-2xl font-black text-slate-900">{stats.pending}</h4>
@@ -83,14 +83,14 @@ const Workers: React.FC = () => {
       </div>
 
       {/* Search & Tabs */}
-      <div className="bg-white p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
+      <div className="bg-white p-4 lg:p-6 rounded-[2.5rem] border border-slate-200 shadow-sm space-y-6">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 w-fit">
+          <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 w-full lg:w-fit overflow-x-auto no-scrollbar">
             {(['ALL', 'APPROVED', 'PENDING'] as const).map(t => (
               <button
                 key={t}
                 onClick={() => setFilter(t)}
-                className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all ${filter === t ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+                className={`flex-1 lg:flex-none px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all whitespace-nowrap ${filter === t ? 'bg-white text-indigo-600 shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
               >
                 {t}
               </button>
@@ -109,9 +109,9 @@ const Workers: React.FC = () => {
           </div>
         </div>
 
-        {/* Worker Table */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
+        {/* Desktop Worker Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left">
             <thead>
               <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">
                 <th className="px-6 py-5">Staff Identity</th>
@@ -180,8 +180,65 @@ const Workers: React.FC = () => {
           </table>
         </div>
 
+        {/* Mobile Worker Cards */}
+        <div className="md:hidden space-y-4">
+          {filteredWorkers.map(user => (
+            <div key={user.id} className="bg-slate-50 p-5 rounded-3xl border border-slate-100 space-y-4 shadow-sm animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black text-xl shadow-lg shadow-indigo-100">
+                    {user.fullName.charAt(0)}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-base font-black text-slate-900 truncate leading-tight">{user.fullName}</h4>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">{user.email}</p>
+                  </div>
+                </div>
+                <span className={`px-3 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest ${user.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {user.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-200/50">
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Unit/Role</p>
+                  <p className="text-[10px] font-black text-slate-800 uppercase truncate">
+                    {user.role.replace('_', ' ')}
+                  </p>
+                  <p className="text-[8px] text-indigo-500 font-bold uppercase">
+                    {units.find(u => u.id === user.unitId)?.name || 'General Registry'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Last Activity</p>
+                  <p className="text-[10px] font-bold text-slate-600">
+                    {user.lastLogin || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                {user.status === 'PENDING' && (
+                  <button 
+                    onClick={() => approveUser(user.id)}
+                    className="flex-1 bg-indigo-600 text-white py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-50"
+                  >
+                    Approve Access
+                  </button>
+                )}
+                <button 
+                  onClick={() => handleDelete(user.id, user.fullName)}
+                  className="flex-1 bg-white text-rose-600 border border-rose-100 py-3 rounded-2xl font-black text-[9px] uppercase tracking-widest hover:bg-rose-50 transition-all shadow-sm"
+                >
+                  Remove Staff
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
         {filteredWorkers.length === 0 && (
-          <div className="py-24 text-center bg-slate-50/50 rounded-3xl">
+          <div className="py-24 text-center bg-slate-50/50 rounded-3xl border-2 border-dashed border-slate-100">
             <div className="flex flex-col items-center">
                <span className="text-6xl mb-6 grayscale opacity-20">👥</span>
                <p className="text-slate-400 font-black text-xs uppercase tracking-[0.3em]">No Registry Entries</p>
