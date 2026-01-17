@@ -14,10 +14,17 @@ const FirstTimers: React.FC = () => {
   const churchFTs = firstTimers.filter(ft => ft.churchId === currentUser?.churchId);
   const churchWorkers = users.filter(u => u.churchId === currentUser?.churchId && u.status === 'APPROVED');
   
-  // Permission check: Only Pastor (CHURCH_ADMIN) and Unit Head (UNIT_HEAD) can add/assign visitors
-  const canManageVisitors = currentUser?.role === UserRole.CHURCH_ADMIN || currentUser?.role === UserRole.UNIT_HEAD;
+  // Permission checks
+  const isAdminOrUnitHead = currentUser?.role === UserRole.CHURCH_ADMIN || currentUser?.role === UserRole.UNIT_HEAD;
+  
+  const canUpdateFTStatus = (ft: FirstTimer) => {
+    if (isAdminOrUnitHead) return true;
+    if (currentUser?.id === ft.assignedTo) return true;
+    return false;
+  };
 
   const handleAISuggestion = async (ft: FirstTimer) => {
+    if (!canUpdateFTStatus(ft)) return;
     setStrategyLoading(ft.id);
     setStrategyContent(null);
     const strategy = await getFollowUpStrategy(ft.notes, ft.fullName);
@@ -27,16 +34,18 @@ const FirstTimers: React.FC = () => {
   };
 
   const handleStatusUpdate = (ft: FirstTimer, newStatus: FollowUpStatus) => {
+    if (!canUpdateFTStatus(ft)) return;
     updateFirstTimer(ft.id, { status: newStatus });
   };
 
   const handleAssignmentUpdate = (ftId: string, workerId: string) => {
+    if (!isAdminOrUnitHead) return;
     updateFirstTimer(ftId, { assignedTo: workerId });
   };
 
   const handleFollowUpSave = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!editingFT) return;
+    if (!editingFT || !canUpdateFTStatus(editingFT)) return;
     
     const formData = new FormData(e.currentTarget);
     const newStatus = formData.get('status') as FollowUpStatus;
@@ -64,9 +73,9 @@ const FirstTimers: React.FC = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h3 className="text-xl lg:text-3xl font-black text-slate-800 tracking-tight">Visitor Tracking</h3>
-          <p className="text-sm text-slate-500">Manage first-time guests and engagement</p>
+          <p className="text-sm text-slate-500 font-medium">Manage first-time guests and engagement</p>
         </div>
-        {canManageVisitors && (
+        {isAdminOrUnitHead && (
           <button 
             onClick={() => setShowAddModal(true)}
             className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"
@@ -90,69 +99,85 @@ const FirstTimers: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {churchFTs.map(ft => (
-                <tr key={ft.id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-5">
-                    <div className="font-bold text-slate-800 text-sm lg:text-base">{ft.fullName}</div>
-                    <div className="text-[10px] lg:text-xs text-slate-500 font-medium tracking-tight">{ft.phone}</div>
-                  </td>
-                  <td className="px-8 py-5 text-xs lg:text-sm text-slate-600 font-medium whitespace-nowrap">
-                    {ft.dateVisited}
-                  </td>
-                  <td className="px-8 py-5">
-                    {canManageVisitors ? (
-                      <select 
-                        value={ft.assignedTo || ''}
-                        onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
-                        className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 cursor-pointer appearance-none shadow-sm"
-                      >
-                        <option value="">Unassigned</option>
-                        {churchWorkers.map(worker => (
-                          <option key={worker.id} value={worker.id}>{worker.fullName}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl inline-flex items-center gap-2">
-                        <span className="text-xs">👤</span> {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Unassigned'}
+              {churchFTs.map(ft => {
+                const authorized = canUpdateFTStatus(ft);
+                return (
+                  <tr key={ft.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-8 py-5">
+                      <div className="font-bold text-slate-800 text-sm lg:text-base">{ft.fullName}</div>
+                      <div className="text-[10px] lg:text-xs text-slate-500 font-medium tracking-tight">{ft.phone}</div>
+                    </td>
+                    <td className="px-8 py-5 text-xs lg:text-sm text-slate-600 font-medium whitespace-nowrap">
+                      {ft.dateVisited}
+                    </td>
+                    <td className="px-8 py-5">
+                      {isAdminOrUnitHead ? (
+                        <select 
+                          value={ft.assignedTo || ''}
+                          onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
+                          className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 cursor-pointer appearance-none shadow-sm"
+                        >
+                          <option value="">Unassigned</option>
+                          {churchWorkers.map(worker => (
+                            <option key={worker.id} value={worker.id}>{worker.fullName}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl inline-flex items-center gap-2">
+                          <span className="text-xs">👤</span> {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Unassigned'}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-8 py-5">
+                      {authorized ? (
+                        <select 
+                          value={ft.status}
+                          onChange={(e) => handleStatusUpdate(ft, e.target.value as FollowUpStatus)}
+                          className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight outline-none border-none cursor-pointer appearance-none text-center transition-colors shadow-sm ${getStatusColorClass(ft.status)}`}
+                        >
+                          {Object.values(FollowUpStatus).map(status => (
+                            <option key={status} value={status} className="bg-white text-slate-800 normal-case font-medium">
+                              {status}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight text-center shadow-sm ${getStatusColorClass(ft.status)}`}>
+                          {ft.status}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <div className="flex justify-end items-center gap-3">
+                        {authorized && (
+                          <>
+                            <button 
+                              onClick={() => handleAISuggestion(ft)}
+                              disabled={strategyLoading === ft.id}
+                              className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all ${
+                                strategyLoading === ft.id 
+                                ? 'bg-slate-100 text-slate-400' 
+                                : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'
+                              }`}
+                            >
+                              {strategyLoading === ft.id ? 'Analyzing...' : '✨ Strategy'}
+                            </button>
+                            <button 
+                              onClick={() => setEditingFT(ft)}
+                              className="text-slate-400 hover:text-indigo-600 p-2.5 rounded-xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100"
+                            >
+                              ✏️
+                            </button>
+                          </>
+                        )}
+                        {!authorized && (
+                          <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest pr-4 italic">View Only</span>
+                        )}
                       </div>
-                    )}
-                  </td>
-                  <td className="px-8 py-5">
-                    <select 
-                      value={ft.status}
-                      onChange={(e) => handleStatusUpdate(ft, e.target.value as FollowUpStatus)}
-                      className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tight outline-none border-none cursor-pointer appearance-none text-center transition-colors shadow-sm ${getStatusColorClass(ft.status)}`}
-                    >
-                      {Object.values(FollowUpStatus).map(status => (
-                        <option key={status} value={status} className="bg-white text-slate-800 normal-case font-medium">
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
-                  <td className="px-8 py-5 text-right">
-                    <div className="flex justify-end items-center gap-3">
-                      <button 
-                        onClick={() => handleAISuggestion(ft)}
-                        disabled={strategyLoading === ft.id}
-                        className={`text-[10px] font-black uppercase tracking-widest px-4 py-2 rounded-xl transition-all ${
-                          strategyLoading === ft.id 
-                          ? 'bg-slate-100 text-slate-400' 
-                          : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-100'
-                        }`}
-                      >
-                        {strategyLoading === ft.id ? 'Analyzing...' : '✨ Strategy'}
-                      </button>
-                      <button 
-                        onClick={() => setEditingFT(ft)}
-                        className="text-slate-400 hover:text-indigo-600 p-2.5 rounded-xl hover:bg-indigo-50 transition-all border border-transparent hover:border-indigo-100"
-                      >
-                        ✏️
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -160,71 +185,84 @@ const FirstTimers: React.FC = () => {
 
       {/* Mobile View (Cards) */}
       <div className="md:hidden space-y-4">
-        {churchFTs.map(ft => (
-          <div key={ft.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
-            <div className="flex justify-between items-start">
-              <div className="min-w-0">
-                <h4 className="font-black text-slate-800 text-lg truncate tracking-tight">{ft.fullName}</h4>
-                <p className="text-xs text-slate-500 font-bold tracking-widest uppercase">{ft.phone}</p>
-              </div>
-              <button 
-                onClick={() => setEditingFT(ft)}
-                className="p-3 text-slate-400 bg-slate-50 rounded-2xl hover:text-indigo-600"
-              >
-                ✏️
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 text-center">
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Visited</p>
-                <p className="text-xs font-bold text-slate-700">{ft.dateVisited}</p>
-              </div>
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Follow-up</p>
-                {canManageVisitors ? (
-                   <select 
-                    value={ft.assignedTo || ''}
-                    onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
-                    className="text-[10px] font-black text-indigo-600 bg-transparent border-none focus:ring-0 p-0 text-center uppercase"
+        {churchFTs.map(ft => {
+          const authorized = canUpdateFTStatus(ft);
+          return (
+            <div key={ft.id} className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+              <div className="flex justify-between items-start">
+                <div className="min-w-0">
+                  <h4 className="font-black text-slate-800 text-lg truncate tracking-tight">{ft.fullName}</h4>
+                  <p className="text-xs text-slate-500 font-bold tracking-widest uppercase">{ft.phone}</p>
+                </div>
+                {authorized && (
+                  <button 
+                    onClick={() => setEditingFT(ft)}
+                    className="p-3 text-slate-400 bg-slate-50 rounded-2xl hover:text-indigo-600"
                   >
-                    <option value="">Unassigned</option>
-                    {churchWorkers.map(worker => (
-                      <option key={worker.id} value={worker.id}>{worker.fullName}</option>
+                    ✏️
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-center">
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Visited</p>
+                  <p className="text-xs font-bold text-slate-700">{ft.dateVisited}</p>
+                </div>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Follow-up</p>
+                  {isAdminOrUnitHead ? (
+                    <select 
+                      value={ft.assignedTo || ''}
+                      onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
+                      className="text-[10px] font-black text-indigo-600 bg-transparent border-none focus:ring-0 p-0 text-center uppercase"
+                    >
+                      <option value="">Unassigned</option>
+                      {churchWorkers.map(worker => (
+                        <option key={worker.id} value={worker.id}>{worker.fullName}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <p className="text-xs font-bold text-indigo-600 truncate max-w-full">
+                      {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Pending'}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Progress Tracking</label>
+                {authorized ? (
+                  <select 
+                    value={ft.status}
+                    onChange={(e) => handleStatusUpdate(ft, e.target.value as FollowUpStatus)}
+                    className={`w-full p-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none cursor-pointer appearance-none text-center transition-colors shadow-sm ${getStatusColorClass(ft.status)}`}
+                  >
+                    {Object.values(FollowUpStatus).map(status => (
+                      <option key={status} value={status}>{status}</option>
                     ))}
                   </select>
                 ) : (
-                  <p className="text-xs font-bold text-indigo-600 truncate max-w-full">
-                    {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Pending'}
-                  </p>
+                  <div className={`w-full p-4 rounded-2xl text-xs font-black uppercase tracking-widest text-center shadow-sm ${getStatusColorClass(ft.status)}`}>
+                    {ft.status}
+                  </div>
                 )}
               </div>
-            </div>
 
-            <div className="space-y-3">
-              <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Update Progress</label>
-              <select 
-                value={ft.status}
-                onChange={(e) => handleStatusUpdate(ft, e.target.value as FollowUpStatus)}
-                className={`w-full p-4 rounded-2xl text-xs font-black uppercase tracking-widest outline-none border-none cursor-pointer appearance-none text-center transition-colors shadow-sm ${getStatusColorClass(ft.status)}`}
-              >
-                {Object.values(FollowUpStatus).map(status => (
-                  <option key={status} value={status}>{status}</option>
-                ))}
-              </select>
+              {authorized && (
+                <button 
+                  onClick={() => handleAISuggestion(ft)}
+                  disabled={strategyLoading === ft.id}
+                  className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {strategyLoading === ft.id ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                  ) : '✨ Generate AI Strategy'}
+                </button>
+              )}
             </div>
-
-            <button 
-              onClick={() => handleAISuggestion(ft)}
-              disabled={strategyLoading === ft.id}
-              className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl text-[10px] uppercase tracking-[0.2em] shadow-xl disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {strategyLoading === ft.id ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-              ) : '✨ Generate AI Strategy'}
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {churchFTs.length === 0 && (
@@ -315,7 +353,7 @@ const FirstTimers: React.FC = () => {
       )}
 
       {/* Guest Registration Modal */}
-      {showAddModal && canManageVisitors && (
+      {showAddModal && isAdminOrUnitHead && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-[2.5rem] lg:rounded-[3rem] w-full max-w-xl p-8 lg:p-12 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-10">
