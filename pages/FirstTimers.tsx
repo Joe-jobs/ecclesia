@@ -5,16 +5,17 @@ import { FollowUpStatus, FirstTimer, UserRole } from '../types';
 import { getFollowUpStrategy } from '../geminiService';
 
 const FirstTimers: React.FC = () => {
-  const { firstTimers, currentUser, addFirstTimer, updateFirstTimer } = useApp();
+  const { firstTimers, currentUser, addFirstTimer, updateFirstTimer, users } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFT, setEditingFT] = useState<FirstTimer | null>(null);
   const [strategyLoading, setStrategyLoading] = useState<string | null>(null);
   const [strategyContent, setStrategyContent] = useState<string | null>(null);
 
   const churchFTs = firstTimers.filter(ft => ft.churchId === currentUser?.churchId);
+  const churchWorkers = users.filter(u => u.churchId === currentUser?.churchId && u.status === 'APPROVED');
   
-  // Permission check: Only Pastor (CHURCH_ADMIN) and Unit Head (UNIT_HEAD) can add visitors
-  const canAddVisitor = currentUser?.role === UserRole.CHURCH_ADMIN || currentUser?.role === UserRole.UNIT_HEAD;
+  // Permission check: Only Pastor (CHURCH_ADMIN) and Unit Head (UNIT_HEAD) can add/assign visitors
+  const canManageVisitors = currentUser?.role === UserRole.CHURCH_ADMIN || currentUser?.role === UserRole.UNIT_HEAD;
 
   const handleAISuggestion = async (ft: FirstTimer) => {
     setStrategyLoading(ft.id);
@@ -27,6 +28,10 @@ const FirstTimers: React.FC = () => {
 
   const handleStatusUpdate = (ft: FirstTimer, newStatus: FollowUpStatus) => {
     updateFirstTimer(ft.id, { status: newStatus });
+  };
+
+  const handleAssignmentUpdate = (ftId: string, workerId: string) => {
+    updateFirstTimer(ftId, { assignedTo: workerId });
   };
 
   const handleFollowUpSave = (e: React.FormEvent<HTMLFormElement>) => {
@@ -61,7 +66,7 @@ const FirstTimers: React.FC = () => {
           <h3 className="text-xl lg:text-3xl font-black text-slate-800 tracking-tight">Visitor Tracking</h3>
           <p className="text-sm text-slate-500">Manage first-time guests and engagement</p>
         </div>
-        {canAddVisitor && (
+        {canManageVisitors && (
           <button 
             onClick={() => setShowAddModal(true)}
             className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl hover:bg-indigo-700 transition shadow-xl shadow-indigo-100 font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2"
@@ -95,9 +100,22 @@ const FirstTimers: React.FC = () => {
                     {ft.dateVisited}
                   </td>
                   <td className="px-8 py-5">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl inline-flex items-center gap-2">
-                      <span className="text-xs">👤</span> {ft.assignedTo ? 'Assigned' : 'Unassigned'}
-                    </div>
+                    {canManageVisitors ? (
+                      <select 
+                        value={ft.assignedTo || ''}
+                        onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
+                        className="bg-indigo-50 text-indigo-600 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border-none focus:ring-2 focus:ring-indigo-500 cursor-pointer appearance-none shadow-sm"
+                      >
+                        <option value="">Unassigned</option>
+                        {churchWorkers.map(worker => (
+                          <option key={worker.id} value={worker.id}>{worker.fullName}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl inline-flex items-center gap-2">
+                        <span className="text-xs">👤</span> {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Unassigned'}
+                      </div>
+                    )}
                   </td>
                   <td className="px-8 py-5">
                     <select 
@@ -162,9 +180,24 @@ const FirstTimers: React.FC = () => {
                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Visited</p>
                 <p className="text-xs font-bold text-slate-700">{ft.dateVisited}</p>
               </div>
-              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Assignment</p>
-                <p className="text-xs font-bold text-indigo-600">{ft.assignedTo ? 'Assigned' : 'Pending'}</p>
+              <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 flex flex-col items-center justify-center">
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mb-1">Follow-up</p>
+                {canManageVisitors ? (
+                   <select 
+                    value={ft.assignedTo || ''}
+                    onChange={(e) => handleAssignmentUpdate(ft.id, e.target.value)}
+                    className="text-[10px] font-black text-indigo-600 bg-transparent border-none focus:ring-0 p-0 text-center uppercase"
+                  >
+                    <option value="">Unassigned</option>
+                    {churchWorkers.map(worker => (
+                      <option key={worker.id} value={worker.id}>{worker.fullName}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="text-xs font-bold text-indigo-600 truncate max-w-full">
+                    {ft.assignedTo ? (users.find(u => u.id === ft.assignedTo)?.fullName || 'Assigned') : 'Pending'}
+                  </p>
+                )}
               </div>
             </div>
 
@@ -282,7 +315,7 @@ const FirstTimers: React.FC = () => {
       )}
 
       {/* Guest Registration Modal */}
-      {showAddModal && canAddVisitor && (
+      {showAddModal && canManageVisitors && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-[70] p-4">
           <div className="bg-white rounded-[2.5rem] lg:rounded-[3rem] w-full max-w-xl p-8 lg:p-12 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-10">

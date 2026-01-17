@@ -12,6 +12,7 @@ import Properties from './pages/Properties';
 import Announcements from './pages/Announcements';
 import Events from './pages/Events';
 import Accounting from './pages/Accounting';
+import Workers from './pages/Workers';
 import Login from './pages/Login';
 
 const AppContent: React.FC = () => {
@@ -34,6 +35,7 @@ const AppContent: React.FC = () => {
       case 'announcements': return <Announcements />;
       case 'events': return <Events />;
       case 'accounting': return <Accounting />;
+      case 'workers': return <Workers />;
       default: return <Dashboard />;
     }
   };

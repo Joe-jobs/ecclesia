@@ -33,6 +33,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '🏠', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
     { id: 'superadmin', label: 'Platform Mgmt', icon: '🌐', roles: [UserRole.PLATFORM_OWNER] },
+    { id: 'workers', label: 'Staff Registry', icon: '👥', roles: [UserRole.CHURCH_ADMIN] },
     { id: 'first-timers', label: 'First Timers', icon: '👋', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
     { id: 'attendance', label: 'Attendance', icon: '📊', roles: [UserRole.CHURCH_ADMIN] },
     { id: 'tasks', label: 'Action Plans', icon: '📋', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
@@ -91,7 +92,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
             ✕
           </button>
         </div>
-        <nav className="flex-1 mt-4 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 mt-4 overflow-y-auto custom-scrollbar no-scrollbar">
           {filteredMenuItems.map(item => (
             <button
               key={item.id}

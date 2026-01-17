@@ -17,7 +17,7 @@ const Login: React.FC = () => {
   // Secret access state
   const [isSecretVisible, setIsSecretVisible] = useState(false);
 
-  // Signup State (Strictly Church Admin or Worker)
+  // Signup/Registration State
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [churchCity, setChurchCity] = useState('');
@@ -25,6 +25,7 @@ const Login: React.FC = () => {
   const [churchCountry, setChurchCountry] = useState('');
   const [newChurchName, setNewChurchName] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
 
   // Verification State
   const [isVerifying, setIsVerifying] = useState(false);
@@ -73,7 +74,7 @@ const Login: React.FC = () => {
       setIsPendingApproval(true);
       return;
     }
-    login(email);
+    login(email, password);
   };
 
   const startVerification = (e: React.FormEvent) => {
@@ -105,6 +106,7 @@ const Login: React.FC = () => {
         churchId: targetChurchId,
         fullName,
         email,
+        password: signupPassword,
         role: UserRole.WORKER,
         unitId: selectedUnitId,
         status: 'PENDING'
@@ -128,11 +130,12 @@ const Login: React.FC = () => {
       churchId: church.id,
       fullName,
       email,
+      password: signupPassword,
       role: UserRole.CHURCH_ADMIN,
       status: 'APPROVED'
     });
 
-    login(email);
+    login(email, signupPassword);
   };
 
   const targetChurch = targetChurchId ? churches.find(c => c.id === targetChurchId) : null;
@@ -148,7 +151,7 @@ const Login: React.FC = () => {
            <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Approval Pending</h2>
            <p className="text-slate-500 text-sm leading-relaxed mb-8">
              Your account for <span className="font-bold text-indigo-600">{fullName || 'the church'}</span> has been created. 
-             An Admin will review your registration and grant access shortly.
+             An Admin will review your registration and grant access shortly. You can login once approved using your password.
            </p>
            <button 
              onClick={() => setIsPendingApproval(false)}
@@ -288,6 +291,18 @@ const Login: React.FC = () => {
                     className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Create Password</label>
+                <input 
+                  required
+                  type="password" 
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
+                />
               </div>
 
               {isWorkerJoin ? (

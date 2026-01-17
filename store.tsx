@@ -29,13 +29,14 @@ interface AppState {
 }
 
 interface AppContextProps extends AppState {
-  login: (email: string) => void;
+  login: (email: string, password?: string) => void;
   logout: () => void;
   registerUser: (user: Omit<User, 'id'>) => User;
   addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location'>) => Church;
   setCurrentChurchId: (id: string) => void;
   updateUser: (user: Partial<User>) => void;
   approveUser: (userId: string) => void;
+  deleteUser: (userId: string) => void;
   addFirstTimer: (ft: Omit<FirstTimer, 'id'>) => void;
   updateFirstTimer: (id: string, updates: Partial<FirstTimer>) => void;
   addAttendance: (record: Omit<AttendanceRecord, 'id'>) => void;
@@ -76,7 +77,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         country: 'Nigeria', // Mock default
         phone: '+234 000 000 0000' // Mock default
       })),
-      users: Mocks.MOCK_USERS as any,
+      users: Mocks.MOCK_USERS.map(u => ({ 
+        ...u, 
+        password: 'password123',
+        lastLogin: new Date(Date.now() - Math.random() * 86400000).toLocaleString() 
+      })) as any,
       units: Mocks.MOCK_UNITS,
       firstTimers: Mocks.MOCK_FIRST_TIMERS as any,
       attendance: Mocks.MOCK_ATTENDANCE,
@@ -93,11 +98,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem('ecclesia_state', JSON.stringify(state));
   }, [state]);
 
-  const login = (email: string) => {
-    const user = state.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const login = (email: string, password?: string) => {
+    const userIndex = state.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    const user = state.users[userIndex];
+    
+    // Check password if provided (simple simulation)
+    if (user && password && user.password && user.password !== password) {
+      alert("Invalid password. For demo users, use 'password123'.");
+      return;
+    }
+
     if (user) {
+      const updatedUser = { ...user, lastLogin: new Date().toLocaleString() };
+      const updatedUsers = [...state.users];
+      updatedUsers[userIndex] = updatedUser;
+
       const church = state.churches.find(c => c.id === user.churchId) || null;
-      setState(prev => ({ ...prev, currentUser: user, currentChurch: church }));
+      setState(prev => ({ 
+        ...prev, 
+        currentUser: updatedUser, 
+        currentChurch: church,
+        users: updatedUsers 
+      }));
+    } else {
+      alert("User not found.");
     }
   };
 
@@ -141,6 +165,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setState(prev => ({
       ...prev,
       users: prev.users.map(u => u.id === userId ? { ...u, status: 'APPROVED' } : u)
+    }));
+  };
+
+  const deleteUser = (userId: string) => {
+    setState(prev => ({
+      ...prev,
+      users: prev.users.filter(u => u.id !== userId)
     }));
   };
 
@@ -326,6 +357,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       setCurrentChurchId, 
       updateUser, 
       approveUser, 
+      deleteUser,
       addFirstTimer, 
       updateFirstTimer, 
       addAttendance,

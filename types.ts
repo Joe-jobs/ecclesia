@@ -52,12 +52,14 @@ export interface User {
   churchId: string;
   fullName: string;
   email: string;
+  password?: string; // Added for simulated login
   role: UserRole;
   unitId?: string;
   status: 'PENDING' | 'APPROVED';
   dateOfBirth?: string;
   anniversaryDate?: string;
   hasAccountingAccess?: boolean;
+  lastLogin?: string; // New field for worker activity tracking
 }
 
 export interface Unit {
@@ -127,7 +129,9 @@ export interface Property {
   unitId: string;
   name: string;
   quantity: number;
-  status: 'Functional' | 'Maintenance' | 'Damaged';
+  functionalQty: number;
+  maintenanceQty: number;
+  damagedQty: number;
 }
 
 export interface ChurchEvent {

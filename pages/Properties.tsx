@@ -25,42 +25,38 @@ const Properties: React.FC = () => {
   });
 
   const stats = {
-    total: filteredProps.length,
-    totalQuantity: filteredProps.reduce((acc, curr) => acc + curr.quantity, 0),
-    maintenance: filteredProps.filter(p => p.status === 'Maintenance').length,
-    damaged: filteredProps.filter(p => p.status === 'Damaged').length
+    totalQuantity: filteredProps.reduce((acc, curr) => acc + (curr.quantity || 0), 0),
+    totalFunctional: filteredProps.reduce((acc, curr) => acc + (curr.functionalQty || 0), 0),
+    totalMaintenance: filteredProps.reduce((acc, curr) => acc + (curr.maintenanceQty || 0), 0),
+    totalDamaged: filteredProps.reduce((acc, curr) => acc + (curr.damagedQty || 0), 0)
   };
 
   const handleCreateOrUpdate = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const name = formData.get('name') as string;
-    const quantity = parseInt(formData.get('quantity') as string);
+    const func = parseInt(formData.get('functionalQty') as string) || 0;
+    const maint = parseInt(formData.get('maintenanceQty') as string) || 0;
+    const dmg = parseInt(formData.get('damagedQty') as string) || 0;
     const unitId = formData.get('unitId') as string;
-    const status = formData.get('status') as any;
+
+    const payload = {
+      churchId: currentUser!.churchId,
+      name,
+      functionalQty: func,
+      maintenanceQty: maint,
+      damagedQty: dmg,
+      quantity: func + maint + dmg,
+      unitId,
+    };
 
     if (editingProp) {
-      updateProperty(editingProp.id, { name, quantity, unitId, status });
+      updateProperty(editingProp.id, payload);
     } else {
-      addProperty({
-        churchId: currentUser!.churchId,
-        name,
-        quantity,
-        unitId,
-        status
-      });
+      addProperty(payload);
     }
     setShowAddModal(false);
     setEditingProp(null);
-  };
-
-  const getStatusStyle = (status: string) => {
-    switch (status) {
-      case 'Functional': return 'bg-emerald-100 text-emerald-700';
-      case 'Maintenance': return 'bg-amber-100 text-amber-700';
-      case 'Damaged': return 'bg-rose-100 text-rose-700';
-      default: return 'bg-slate-100 text-slate-700';
-    }
   };
 
   return (
@@ -79,22 +75,22 @@ const Properties: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-6">
-        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden">
-          <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Total Units</p>
-          <p className="text-2xl lg:text-4xl font-black text-slate-800 tracking-tighter">{stats.totalQuantity}</p>
-          <div className="absolute top-0 right-0 p-4 opacity-5 text-4xl">📦</div>
+        <div className="bg-slate-900 p-5 lg:p-8 rounded-[2rem] text-white shadow-xl relative overflow-hidden group">
+          <p className="text-[9px] lg:text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-2">Total Inventory</p>
+          <p className="text-2xl lg:text-4xl font-black tracking-tighter">{stats.totalQuantity}</p>
+          <div className="absolute top-0 right-0 p-4 opacity-10 text-4xl group-hover:scale-110 transition-transform">📦</div>
         </div>
-        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-          <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Categories</p>
-          <p className="text-2xl lg:text-4xl font-black text-indigo-600 tracking-tighter">{stats.total}</p>
+        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-[9px] lg:text-[10px] font-black text-emerald-500 uppercase tracking-[0.2em] mb-2">Functional</p>
+          <p className="text-2xl lg:text-4xl font-black text-slate-800 tracking-tighter">{stats.totalFunctional}</p>
         </div>
-        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-          <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Maintenance</p>
-          <p className="text-2xl lg:text-4xl font-black text-amber-500 tracking-tighter">{stats.maintenance}</p>
+        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-[9px] lg:text-[10px] font-black text-amber-500 uppercase tracking-[0.2em] mb-2">Maintenance</p>
+          <p className="text-2xl lg:text-4xl font-black text-slate-800 tracking-tighter">{stats.totalMaintenance}</p>
         </div>
-        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
-          <p className="text-[9px] lg:text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2">Damaged</p>
-          <p className="text-2xl lg:text-4xl font-black text-rose-500 tracking-tighter">{stats.damaged}</p>
+        <div className="bg-white p-5 lg:p-8 rounded-[2rem] border border-slate-200 shadow-sm flex flex-col justify-center">
+          <p className="text-[9px] lg:text-[10px] font-black text-rose-500 uppercase tracking-[0.2em] mb-2">Damaged</p>
+          <p className="text-2xl lg:text-4xl font-black text-slate-800 tracking-tighter">{stats.totalDamaged}</p>
         </div>
       </div>
 
@@ -129,11 +125,11 @@ const Properties: React.FC = () => {
           <table className="w-full text-left">
             <thead className="bg-slate-50">
               <tr className="text-slate-400 text-[10px] uppercase tracking-widest font-black">
-                <th className="px-8 py-5">Item Details</th>
-                <th className="px-8 py-5">Department</th>
-                <th className="px-8 py-5">Qty</th>
-                <th className="px-8 py-5">Condition</th>
-                <th className="px-8 py-5 text-right">Action</th>
+                <th className="px-8 py-5">Asset Description</th>
+                <th className="px-8 py-5 text-center">Department</th>
+                <th className="px-8 py-5 text-center">Status Breakdown</th>
+                <th className="px-8 py-5 text-center">Total</th>
+                <th className="px-8 py-5 text-right">Registry Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -143,18 +139,29 @@ const Properties: React.FC = () => {
                     <p className="font-black text-slate-800 text-sm lg:text-base tracking-tight">{prop.name}</p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">UID: {prop.id.slice(0, 8)}</p>
                   </td>
-                  <td className="px-8 py-5">
+                  <td className="px-8 py-5 text-center">
                     <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100/50">
-                      {units.find(u => u.id === prop.unitId)?.name || 'Central'}
+                      {units.find(u => u.id === prop.unitId)?.name || 'Central Registry'}
                     </span>
                   </td>
                   <td className="px-8 py-5">
+                    <div className="flex items-center justify-center gap-4">
+                      <div className="text-center" title="Functional">
+                        <p className="text-[10px] font-black text-emerald-500 leading-none">{prop.functionalQty || 0}</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Func</p>
+                      </div>
+                      <div className="text-center" title="Maintenance">
+                        <p className="text-[10px] font-black text-amber-500 leading-none">{prop.maintenanceQty || 0}</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Maint</p>
+                      </div>
+                      <div className="text-center" title="Damaged">
+                        <p className="text-[10px] font-black text-rose-500 leading-none">{prop.damagedQty || 0}</p>
+                        <p className="text-[7px] font-bold text-slate-400 uppercase tracking-tighter">Dmg</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 text-center">
                     <span className="text-base font-black text-slate-600">{prop.quantity}</span>
-                  </td>
-                  <td className="px-8 py-5">
-                    <span className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter ${getStatusStyle(prop.status)}`}>
-                      {prop.status}
-                    </span>
                   </td>
                   <td className="px-8 py-5 text-right">
                     <div className="flex justify-end gap-3">
@@ -167,7 +174,7 @@ const Properties: React.FC = () => {
                       >✏️</button>
                       <button 
                         onClick={() => {
-                          if (confirm('Permanently remove this item?')) {
+                          if (confirm('Permanently remove this asset from registry?')) {
                             deleteProperty(prop.id);
                           }
                         }}
@@ -188,28 +195,34 @@ const Properties: React.FC = () => {
               <div className="flex justify-between items-start">
                 <div className="min-w-0 flex-1">
                   <h4 className="font-black text-slate-800 text-lg tracking-tight truncate">{prop.name}</h4>
-                  <div className="flex gap-2 mt-2">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg">
-                      {units.find(u => u.id === prop.unitId)?.name || 'Unknown'}
-                    </span>
-                  </div>
+                  <p className="text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-1 rounded-lg inline-block mt-1">
+                    {units.find(u => u.id === prop.unitId)?.name || 'Central Registry'}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button 
                     onClick={() => { setEditingProp(prop); setShowAddModal(true); }}
-                    className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600"
+                    className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600 shadow-sm"
                   >✏️</button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-4 gap-2">
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100 text-center">
-                  <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Quantity</p>
-                  <p className="text-xl font-black text-slate-800">{prop.quantity}</p>
+                  <p className="text-[7px] font-black text-slate-400 uppercase mb-1">Total</p>
+                  <p className="text-sm font-black text-slate-800">{prop.quantity}</p>
                 </div>
-                <div className={`p-3 rounded-2xl border border-slate-100 text-center ${getStatusStyle(prop.status)}`}>
-                  <p className="text-[8px] font-black uppercase tracking-widest mb-1 opacity-60">Status</p>
-                  <p className="text-[10px] font-black uppercase tracking-widest">{prop.status}</p>
+                <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 text-center">
+                  <p className="text-[7px] font-black text-emerald-500 uppercase mb-1">Func</p>
+                  <p className="text-sm font-black text-emerald-600">{prop.functionalQty || 0}</p>
+                </div>
+                <div className="bg-amber-50/50 p-3 rounded-2xl border border-amber-100/50 text-center">
+                  <p className="text-[7px] font-black text-amber-500 uppercase mb-1">Maint</p>
+                  <p className="text-sm font-black text-amber-600">{prop.maintenanceQty || 0}</p>
+                </div>
+                <div className="bg-rose-50/50 p-3 rounded-2xl border border-rose-100/50 text-center">
+                  <p className="text-[7px] font-black text-rose-500 uppercase mb-1">Dmg</p>
+                  <p className="text-sm font-black text-rose-600">{prop.damagedQty || 0}</p>
                 </div>
               </div>
             </div>
@@ -220,7 +233,7 @@ const Properties: React.FC = () => {
           <div className="py-24 text-center bg-slate-50/50">
             <div className="flex flex-col items-center">
                <span className="text-6xl mb-6 grayscale opacity-20">📦</span>
-               <p className="text-slate-400 font-black text-xs uppercase tracking-[0.3em]">Vault is Empty</p>
+               <p className="text-slate-400 font-black text-xs uppercase tracking-[0.3em]">Registry Empty</p>
                <p className="text-sm text-slate-400 mt-2 font-medium">No assets matching your search found.</p>
             </div>
           </div>
@@ -229,10 +242,10 @@ const Properties: React.FC = () => {
 
       {(showAddModal || editingProp) && (
         <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-[70] p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-8 lg:p-12 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto custom-scrollbar">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg p-8 lg:p-12 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[95vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-10">
               <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">
-                {editingProp ? 'Asset Update' : 'New Registry'}
+                {editingProp ? 'Modify Registry' : 'Asset Acquisition'}
               </h2>
               <button 
                 onClick={() => { setShowAddModal(false); setEditingProp(null); }} 
@@ -240,46 +253,59 @@ const Properties: React.FC = () => {
               >✕</button>
             </div>
             
-            <form onSubmit={handleCreateOrUpdate} className="space-y-6">
+            <form onSubmit={handleCreateOrUpdate} className="space-y-8">
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Equipment Identity</label>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Asset Designation</label>
                 <input 
                   required 
                   name="name" 
                   defaultValue={editingProp?.name}
-                  placeholder="e.g., Wireless Mic Set (Sennheiser)" 
+                  placeholder="e.g., Mackie Thump Go 8-inch Speaker" 
                   className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:outline-none border bg-slate-50 text-sm font-bold shadow-inner" 
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Count</label>
-                  <input 
-                    required 
-                    name="quantity" 
-                    type="number"
-                    min="1"
-                    defaultValue={editingProp?.quantity || 1}
-                    className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:outline-none border bg-slate-50 text-sm font-bold shadow-inner" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Condition</label>
-                  <select 
-                    name="status" 
-                    defaultValue={editingProp?.status || 'Functional'}
-                    className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:outline-none border bg-slate-50 text-xs font-black uppercase tracking-widest shadow-inner cursor-pointer"
-                  >
-                    <option value="Functional">Functional</option>
-                    <option value="Maintenance">Maintenance</option>
-                    <option value="Damaged">Damaged</option>
-                  </select>
+              <div>
+                <p className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Inventory Breakdown</p>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="block text-[9px] font-black text-emerald-600 uppercase text-center">Functional</label>
+                    <input 
+                      required 
+                      type="number"
+                      name="functionalQty" 
+                      min="0"
+                      defaultValue={editingProp?.functionalQty || 0}
+                      className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:outline-none border bg-slate-50 text-sm font-black text-center shadow-inner" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[9px] font-black text-amber-600 uppercase text-center">Maintenance</label>
+                    <input 
+                      required 
+                      type="number"
+                      name="maintenanceQty" 
+                      min="0"
+                      defaultValue={editingProp?.maintenanceQty || 0}
+                      className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 focus:outline-none border bg-slate-50 text-sm font-black text-center shadow-inner" 
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="block text-[9px] font-black text-rose-600 uppercase text-center">Damaged</label>
+                    <input 
+                      required 
+                      type="number"
+                      name="damagedQty" 
+                      min="0"
+                      defaultValue={editingProp?.damagedQty || 0}
+                      className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500 focus:outline-none border bg-slate-50 text-sm font-black text-center shadow-inner" 
+                    />
+                  </div>
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Departmental Owner</label>
+                <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3">Custodial Department</label>
                 <select 
                   name="unitId" 
                   disabled={isUnitHead}
@@ -287,7 +313,7 @@ const Properties: React.FC = () => {
                   required
                   className="w-full border-slate-200 rounded-2xl p-4 focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 focus:outline-none border bg-slate-50 text-xs font-black uppercase tracking-widest shadow-inner cursor-pointer disabled:opacity-50"
                 >
-                  <option value="" disabled>Select Department</option>
+                  <option value="" disabled>Select Responsible Unit</option>
                   {units.filter(u => u.churchId === currentUser?.churchId).map(u => (
                     <option key={u.id} value={u.id}>{u.name}</option>
                   ))}
@@ -295,9 +321,9 @@ const Properties: React.FC = () => {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-4 pt-6">
-                <button type="button" onClick={() => { setShowAddModal(false); setEditingProp(null); }} className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-2xl hover:bg-slate-50 font-black text-[10px] uppercase tracking-widest transition-all order-2 sm:order-1">Cancel</button>
+                <button type="button" onClick={() => { setShowAddModal(false); setEditingProp(null); }} className="flex-1 px-8 py-5 border-2 border-slate-100 text-slate-400 rounded-2xl hover:bg-slate-50 font-black text-[10px] uppercase tracking-widest transition-all order-2 sm:order-1">Discard</button>
                 <button type="submit" className="flex-1 px-8 py-5 bg-indigo-600 text-white rounded-2xl hover:bg-indigo-700 font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all order-1 sm:order-2">
-                  {editingProp ? 'Confirm Edit' : 'Add to Vault'}
+                  {editingProp ? 'Confirm Changes' : 'Record Asset'}
                 </button>
               </div>
             </form>

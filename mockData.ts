@@ -52,8 +52,8 @@ export const MOCK_ANNOUNCEMENTS = [
 ];
 
 export const MOCK_PROPERTIES = [
-  { id: 'p1', churchId: 'c1', unitId: 'un1', name: 'Canon R5 Camera', quantity: 2, status: 'Functional' },
-  { id: 'p2', churchId: 'c1', unitId: 'un1', name: 'Video Switcher', quantity: 1, status: 'Functional' },
+  { id: 'p1', churchId: 'c1', unitId: 'un1', name: 'Canon R5 Camera', quantity: 2, functionalQty: 2, maintenanceQty: 0, damagedQty: 0 },
+  { id: 'p2', churchId: 'c1', unitId: 'un1', name: 'Video Switcher', quantity: 1, functionalQty: 1, maintenanceQty: 0, damagedQty: 0 },
 ];
 
 export const MOCK_EVENTS = [
