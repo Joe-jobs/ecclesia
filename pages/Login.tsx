@@ -1,7 +1,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../store';
-import { UserRole } from '../types';
+import { UserRole, User } from '../types';
+import { auth } from '../firebase';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword,
+  updateProfile,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signOut,
+  GoogleAuthProvider,
+  signInWithPopup
+} from 'firebase/auth';
 
 interface LoginProps {
   initialIsSignup?: boolean;
@@ -9,15 +20,21 @@ interface LoginProps {
 }
 
 const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) => {
-  const { login, registerUser, addChurch, churches, units, users } = useApp();
+  const { registerUser, addChurch, churches, units, users, setCurrentUser } = useApp();
   const [isSignup, setIsSignup] = useState(initialIsSignup);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
+  const [isResetSent, setIsResetSent] = useState(false);
   const [isWorkerJoin, setIsWorkerJoin] = useState(false);
   const [targetChurchId, setTargetChurchId] = useState<string | null>(null);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [isChurchSuspended, setIsChurchSuspended] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   
   // Secret access state
@@ -31,13 +48,6 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
   const [churchCountry, setChurchCountry] = useState('');
   const [newChurchName, setNewChurchName] = useState('');
   const [selectedUnitId, setSelectedUnitId] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-
-  // Verification State
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [verificationCode, setVerificationCode] = useState('');
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
 
   // Sync isSignup with initialIsSignup prop only on mount
   useEffect(() => {
@@ -70,97 +80,217 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
 
-  useEffect(() => {
-    let interval: any;
-    if (resendTimer > 0) {
-      interval = setInterval(() => setResendTimer(prev => prev - 1), 1000);
-    }
-    return () => clearInterval(interval);
-  }, [resendTimer]);
-
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (user) {
-      // Check for suspended church
-      const church = churches.find(c => c.id === user.churchId);
-      if (church && church.status === 'SUSPENDED' && user.role !== UserRole.PLATFORM_OWNER) {
-        setIsChurchSuspended(true);
+    setAuthError(null);
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Check for email verification
+      if (!userCredential.user.emailVerified) {
+        await sendEmailVerification(userCredential.user);
+        await signOut(auth); // Ensure they stay in Login state
+        setVerificationEmail(email);
+        setLoading(false);
         return;
       }
-
-      if (user.status === 'PENDING') {
-        setIsPendingApproval(true);
-        return;
-      }
+    } catch (error: any) {
+      console.error(error);
+      setAuthError("password or email incorrect");
+      setLoading(false);
     }
-    login(email, password);
   };
 
-  const startVerification = (e: React.FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    setAuthError(null);
+    setLoading(true);
+    const provider = new GoogleAuthProvider();
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Check if user exists in local state
+      const existingUser = users.find(u => u.email === user.email);
+      
+      if (!existingUser) {
+        // If they are on a worker join page
+        if (isWorkerJoin && targetChurchId) {
+          registerUser({
+            churchId: targetChurchId,
+            fullName: user.displayName || 'Worker',
+            email: user.email || '',
+            role: UserRole.WORKER,
+            unitId: selectedUnitId,
+            status: 'PENDING'
+          });
+          setIsPendingApproval(true);
+          await signOut(auth);
+        } 
+        // If they are trying to sign up a new church
+        else if (isSignup) {
+          const church = addChurch({
+            name: newChurchName || `${user.displayName}'s Church`,
+            city: churchCity || 'Unknown',
+            state: churchState || 'Unknown',
+            country: churchCountry || 'Unknown',
+            phone: phone || 'N/A',
+            adminId: user.uid,
+          });
+
+          const newUser = registerUser({
+            churchId: church.id,
+            fullName: user.displayName || 'Admin',
+            email: user.email || '',
+            role: UserRole.CHURCH_ADMIN,
+            status: 'APPROVED'
+          });
+          setCurrentUser(newUser);
+        }
+      }
+    } catch (error: any) {
+      console.error(error);
+      setAuthError(error.message || "Failed to sign in with Google");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsVerifying(true);
-    setResendTimer(60);
+    setAuthError(null);
+    if (!email) {
+      setAuthError("Please enter your email address first");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setIsResetSent(true);
+    } catch (error: any) {
+      console.error(error);
+      setAuthError("Could not send reset link. Check if email is correct.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleGoogleAuth = () => {
-    setIsGoogleLoading(true);
-    setTimeout(() => {
-      setIsGoogleLoading(false);
-      setIsSignup(true);
-      setEmail('verified.google.user@gmail.com');
-      setFullName('Google User');
-      setIsVerifying(false); 
-    }, 1500);
-  };
-
-  const handleCompleteSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (verificationCode !== '123456' && !email.includes('google')) {
-      alert("Invalid verification code. Please use 123456 for this demo.");
+    setAuthError(null);
+
+    if (password !== confirmPassword) {
+      setAuthError("Passwords do not match");
       return;
     }
 
-    if (isWorkerJoin && targetChurchId) {
-      registerUser({
-        churchId: targetChurchId,
-        fullName,
-        email,
-        password: signupPassword,
-        role: UserRole.WORKER,
-        unitId: selectedUnitId,
-        status: 'PENDING'
-      });
-      setIsPendingApproval(true);
-      setIsVerifying(false);
-      return;
+    setLoading(true);
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const fbUser = userCredential.user;
+
+      await updateProfile(fbUser, { displayName: fullName });
+      
+      // Send Verification Email
+      await sendEmailVerification(fbUser);
+
+      // Handle custom local state logic based on worker join or church admin
+      if (isWorkerJoin && targetChurchId) {
+        registerUser({
+          churchId: targetChurchId,
+          fullName,
+          email,
+          role: UserRole.WORKER,
+          unitId: selectedUnitId,
+          status: 'PENDING'
+        });
+      } else {
+        // New church creation
+        const church = addChurch({
+          name: newChurchName,
+          city: churchCity,
+          state: churchState,
+          country: churchCountry,
+          phone: phone,
+          adminId: fbUser.uid,
+        });
+
+        registerUser({
+          churchId: church.id,
+          fullName,
+          email,
+          role: UserRole.CHURCH_ADMIN,
+          status: 'APPROVED'
+        });
+      }
+
+      // Important: Sign out to force "verify and login" flow
+      await signOut(auth);
+      setVerificationEmail(email);
+    } catch (error: any) {
+      console.error(error);
+      if (error.code === 'auth/email-already-in-use') {
+        setAuthError("user already exist. sign in");
+      } else {
+        setAuthError(error.message || "An error occurred during signup");
+      }
+    } finally {
+      setLoading(false);
     }
-
-    // New church creation with expanded fields
-    const church = addChurch({
-      name: newChurchName,
-      city: churchCity,
-      state: churchState,
-      country: churchCountry,
-      phone: phone,
-      adminId: 'pending',
-    });
-
-    registerUser({
-      churchId: church.id,
-      fullName,
-      email,
-      password: signupPassword,
-      role: UserRole.CHURCH_ADMIN,
-      status: 'APPROVED'
-    });
-
-    login(email, signupPassword);
   };
 
   const targetChurch = targetChurchId ? churches.find(c => c.id === targetChurchId) : null;
   const targetUnits = targetChurchId ? units.filter(u => u.churchId === targetChurchId) : [];
+
+  // Reset Success Screen
+  if (isResetSent) {
+    return (
+      <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 lg:p-14 text-center animate-in zoom-in-95 duration-300">
+           <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-8 text-emerald-600 border-4 border-emerald-100">
+             <span className="text-5xl">✅</span>
+           </div>
+           <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Link Sent</h2>
+           <p className="text-slate-500 text-sm leading-relaxed mb-8">
+             We sent you a password change link to <span className="font-bold text-indigo-600">{email}</span>. Check your inbox and follow the instructions.
+           </p>
+           <button 
+             onClick={() => {
+               setIsResetSent(false);
+               setIsForgotPassword(false);
+             }}
+             className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-indigo-600 transition-all text-[10px] uppercase tracking-widest shadow-xl shadow-slate-100"
+           >
+             Return to Sign In
+           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Verification Screen
+  if (verificationEmail) {
+    return (
+      <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 lg:p-14 text-center animate-in zoom-in-95 duration-300">
+           <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-8 text-indigo-600 border-4 border-indigo-200">
+             <span className="text-5xl">📩</span>
+           </div>
+           <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Check your mail</h2>
+           <p className="text-slate-500 text-sm leading-relaxed mb-8">
+             We have sent a verification mail to <span className="font-bold text-indigo-600">{verificationEmail}</span>. 
+             Verify it and login to access your portal.
+           </p>
+           <button 
+             onClick={() => setVerificationEmail(null)}
+             className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all text-[10px] uppercase tracking-widest"
+           >
+             Return to Login
+           </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isChurchSuspended) {
     return (
@@ -207,67 +337,6 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     );
   }
 
-  if (isVerifying) {
-    return (
-      <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-8 lg:p-12 animate-in zoom-in-95 duration-300">
-          <div className="text-center mb-8">
-            <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <span className="text-4xl">📧</span>
-            </div>
-            <h2 className="text-2xl font-black text-slate-800 mb-2">Verify your email</h2>
-            <p className="text-sm text-slate-500">
-              We've sent a code to <span className="font-bold text-indigo-600">{email}</span>. 
-              Enter it below to continue.
-            </p>
-          </div>
-
-          <form onSubmit={handleCompleteSignup} className="space-y-6">
-            <div>
-              <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-widest text-center">6-Digit Verification Code</label>
-              <input 
-                required
-                type="text" 
-                maxLength={6}
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                placeholder="0 0 0 0 0 0"
-                className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:outline-none transition-all text-3xl font-black text-center tracking-[0.5em]"
-              />
-              <p className="text-center text-[10px] text-slate-400 mt-2 italic">Tip: Use 123456 for the demo</p>
-            </div>
-
-            <button 
-              type="submit"
-              className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all text-sm uppercase tracking-widest"
-            >
-              Verify & Create Account
-            </button>
-
-            <div className="text-center">
-              <button 
-                type="button"
-                disabled={resendTimer > 0}
-                onClick={() => setResendTimer(60)}
-                className={`text-xs font-black uppercase tracking-widest transition-colors ${resendTimer > 0 ? 'text-slate-300' : 'text-indigo-600 hover:text-indigo-800'}`}
-              >
-                {resendTimer > 0 ? `Resend code in ${resendTimer}s` : 'Resend Code'}
-              </button>
-            </div>
-            
-            <button 
-              type="button"
-              onClick={() => setIsVerifying(false)}
-              className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors"
-            >
-              ← Back to Details
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4 lg:p-12 overflow-y-auto">
       <div className="bg-white rounded-[2rem] lg:rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
@@ -283,42 +352,49 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full lg:hidden"></div>
           <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tighter">Ecclesia</h1>
           <p className="text-indigo-200 text-sm lg:text-base opacity-80 uppercase tracking-widest font-bold">
-            {isWorkerJoin ? `Join ${targetChurch?.name || 'Church'}` : isSignup ? 'Create Church Account' : 'Church Management System'}
+            {isWorkerJoin ? `Join ${targetChurch?.name || 'Church'}` : isSignup ? 'Create Church Account' : isForgotPassword ? 'Reset Security Credentials' : 'Church Management System'}
           </p>
         </div>
         
         <div className="p-8 lg:p-12">
-          {/* Third Party Auth */}
-          {!isWorkerJoin && (
-            <div className="mb-8">
-              <button 
-                onClick={handleGoogleAuth}
-                disabled={isGoogleLoading}
-                className="w-full flex items-center justify-center gap-3 py-4 border-2 border-slate-100 rounded-2xl font-bold text-slate-600 hover:bg-slate-50 transition-all relative"
-              >
-                {isGoogleLoading ? (
-                  <div className="w-5 h-5 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
-                ) : (
-                  <>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-                      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-                      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
-                      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-                    </svg>
-                    <span>Continue with Google</span>
-                  </>
-                )}
-              </button>
-              <div className="relative mt-8 mb-4">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-100"></div></div>
-                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest"><span className="bg-white px-4 text-slate-300">Or use email</span></div>
-              </div>
+          {authError && (
+            <div className="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl text-rose-600 text-xs font-bold text-center uppercase tracking-widest animate-in fade-in slide-in-from-top-2 duration-300">
+              {authError}
             </div>
           )}
 
-          {isSignup ? (
-            <form onSubmit={startVerification} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {isForgotPassword ? (
+            <form onSubmit={handleForgotPassword} className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+              <div>
+                <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-[0.2em]">Enter Account Email</label>
+                <input 
+                  required
+                  type="email" 
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="admin@grace.com"
+                  className="w-full px-6 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 focus:outline-none transition-all text-lg font-bold"
+                />
+              </div>
+              <button 
+                type="submit"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em] disabled:opacity-50"
+              >
+                {loading ? 'Requesting...' : 'Get Reset Link'}
+              </button>
+              <div className="text-center pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setIsForgotPassword(false)}
+                  className="text-xs font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors"
+                >
+                  ← Back to Sign In
+                </button>
+              </div>
+            </form>
+          ) : isSignup ? (
+            <form onSubmit={handleSignup} className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div className="md:col-span-1">
                   <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Full Name</label>
@@ -344,16 +420,29 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                 </div>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Create Password</label>
-                <input 
-                  required
-                  type="password" 
-                  value={signupPassword}
-                  onChange={(e) => setSignupPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Create Password</label>
+                  <input 
+                    required
+                    type="password" 
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-slate-400 mb-1.5 uppercase tracking-widest">Confirm Password</label>
+                  <input 
+                    required
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-100 rounded-2xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 focus:outline-none transition-all text-sm font-bold"
+                  />
+                </div>
               </div>
 
               {isWorkerJoin ? (
@@ -455,9 +544,10 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
               <button 
                 type="submit"
-                className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em]"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em] disabled:opacity-50"
               >
-                {isWorkerJoin ? 'Request to Join & Verify' : 'Register Church & Verify'}
+                {loading ? 'Processing...' : (isWorkerJoin ? 'Request to Join' : 'Register Church')}
               </button>
             </form>
           ) : (
@@ -475,7 +565,16 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
               </div>
 
               <div className="relative">
-                <label className="block text-[10px] font-black text-slate-400 mb-2 uppercase tracking-[0.2em]">Password</label>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Password</label>
+                  <button 
+                    type="button" 
+                    onClick={() => setIsForgotPassword(true)}
+                    className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
                 <div className="relative">
                   <input 
                     required
@@ -497,9 +596,39 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
               
               <button 
                 type="submit"
-                className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em]"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em] disabled:opacity-50"
               >
-                Enter Portal
+                {loading ? 'Entering...' : 'Enter Portal'}
+              </button>
+            </form>
+          )}
+
+          {/* Social Auth Separator */}
+          {!isForgotPassword && (
+            <div className="mt-8 space-y-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-100"></div>
+                </div>
+                <div className="relative flex justify-center text-[10px] font-black uppercase tracking-widest">
+                  <span className="bg-white px-4 text-slate-400">Or continue with</span>
+                </div>
+              </div>
+
+              <button 
+                type="button"
+                disabled={loading}
+                onClick={handleGoogleSignIn}
+                className="w-full bg-white border-2 border-slate-100 text-slate-700 font-black py-4 rounded-2xl hover:bg-slate-50 hover:border-slate-200 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-3 shadow-sm active:scale-95 disabled:opacity-50"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                  <path fill="#EA4335" d="M12 5.04c1.64 0 3.12.56 4.28 1.67l3.21-3.21C17.53 1.63 14.99 1 12 1 7.37 1 3.4 3.66 1.45 7.54l3.78 2.94C6.12 7.15 8.84 5.04 12 5.04z" />
+                  <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.34H12v4.44h6.44c-.28 1.47-1.11 2.71-2.36 3.55l3.68 2.85c2.15-1.98 3.39-4.89 3.39-8.5z" />
+                  <path fill="#34A853" d="M5.23 14.98c-.23-.68-.36-1.41-.36-2.18s.13-1.5.36-2.18L1.45 7.68C.53 9.47 0 11.68 0 14s.53 4.53 1.45 6.32l3.78-2.94c-.23-.68-.36-1.41-.36-2.18z" />
+                  <path fill="#FBBC05" d="M12 23c3.24 0 5.96-1.07 7.95-2.91l-3.68-2.85c-1.11.75-2.52 1.19-4.27 1.19-3.16 0-5.88-2.11-6.84-5.01l-3.78 2.94C3.4 20.34 7.37 23 12 23z" />
+                </svg>
+                Google
               </button>
 
               <div className="pt-6 border-t border-slate-100">
@@ -539,13 +668,17 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                   </button>
                 </div>
               )}
-            </form>
+            </div>
           )}
 
           <div className="mt-8 text-center">
             {!isWorkerJoin && (
               <button 
-                onClick={() => setIsSignup(!isSignup)}
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setIsForgotPassword(false);
+                  setAuthError(null);
+                }}
                 className="text-xs font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors"
               >
                 {isSignup ? 'Already have an account? Login' : "New to Ecclesia? Join here"}
@@ -557,6 +690,8 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                   window.location.hash = '';
                   setIsWorkerJoin(false);
                   setIsSignup(false);
+                  setIsForgotPassword(false);
+                  setAuthError(null);
                 }}
                 className="text-xs font-black text-slate-500 hover:text-indigo-600 uppercase tracking-widest transition-colors"
               >

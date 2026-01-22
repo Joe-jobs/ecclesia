@@ -5,6 +5,8 @@ import {
   Announcement, Property, ChurchEvent, UserRole, Transaction, Budget, Currency 
 } from './types';
 import * as Mocks from './mockData';
+import { auth } from './firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 export const EXCHANGE_RATES: Record<Currency, number> = {
   [Currency.USD]: 1,
@@ -59,6 +61,7 @@ interface AppContextProps extends AppState {
   toggleAccountingAccess: (userId: string) => void;
   setChurchCurrency: (churchId: string, currency: Currency) => void;
   toggleChurchStatus: (churchId: string) => void;
+  setCurrentUser: (user: User | null) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -100,35 +103,51 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     localStorage.setItem('ecclesia_state', JSON.stringify(state));
   }, [state]);
 
+  // Sync with Firebase Auth
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      // ONLY set currentUser if their email is verified
+      if (firebaseUser && firebaseUser.emailVerified) {
+        // Find existing user in mock state or create a partial one
+        const existingUser = state.users.find(u => u.email === firebaseUser.email);
+        if (existingUser) {
+          const church = state.churches.find(c => c.id === existingUser.churchId) || null;
+          setState(prev => ({ ...prev, currentUser: existingUser, currentChurch: church }));
+        } else {
+          // Fallback for identified but unsynced users
+          const tempUser: User = {
+            id: firebaseUser.uid,
+            churchId: 'temp',
+            fullName: firebaseUser.displayName || firebaseUser.email || 'User',
+            email: firebaseUser.email || '',
+            role: UserRole.CHURCH_ADMIN,
+            status: 'APPROVED'
+          };
+          setState(prev => ({ ...prev, currentUser: tempUser }));
+        }
+      } else {
+        // Not logged in or not verified
+        setState(prev => ({ ...prev, currentUser: null, currentChurch: null }));
+      }
+    });
+    return () => unsubscribe();
+  }, [state.users, state.churches]);
+
   const login = (email: string, password?: string) => {
-    const userIndex = state.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    const user = state.users[userIndex];
-    
-    // Check password if provided (simple simulation)
-    if (user && password && user.password && user.password !== password) {
-      alert("Invalid password. For demo users, use 'password123'.");
-      return;
-    }
-
+    const user = state.users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (user) {
-      const updatedUser = { ...user, lastLogin: new Date().toLocaleString() };
-      const updatedUsers = [...state.users];
-      updatedUsers[userIndex] = updatedUser;
-
       const church = state.churches.find(c => c.id === user.churchId) || null;
-      setState(prev => ({ 
-        ...prev, 
-        currentUser: updatedUser, 
-        currentChurch: church,
-        users: updatedUsers 
-      }));
-    } else {
-      alert("User not found.");
+      setState(prev => ({ ...prev, currentUser: user, currentChurch: church }));
     }
   };
 
   const logout = () => {
+    signOut(auth);
     setState(prev => ({ ...prev, currentUser: null, currentChurch: null }));
+  };
+
+  const setCurrentUser = (user: User | null) => {
+    setState(prev => ({ ...prev, currentUser: user }));
   };
 
   const addChurch = (churchData: Omit<Church, 'id' | 'createdAt' | 'location' | 'status'>) => {
@@ -400,7 +419,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addBudget,
       toggleAccountingAccess,
       setChurchCurrency,
-      toggleChurchStatus
+      toggleChurchStatus,
+      setCurrentUser
     }}>
       {children}
     </AppContext.Provider>
