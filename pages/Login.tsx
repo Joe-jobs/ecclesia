@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useApp } from '../store';
 import { UserRole, User } from '../types';
 import { auth } from '../firebase';
@@ -62,8 +62,11 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
         setIsSecretVisible(true);
         setIsWorkerJoin(false);
       } else if (hash.startsWith('#join-worker')) {
-        const params = new URLSearchParams(hash.split('?')[1]);
+        // More robust parsing for hash parameters
+        const queryString = hash.includes('?') ? hash.split('?')[1] : '';
+        const params = new URLSearchParams(queryString);
         const churchId = params.get('churchId');
+        
         if (churchId) {
           setIsWorkerJoin(true);
           setTargetChurchId(churchId);
@@ -72,6 +75,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       } else {
         setIsSecretVisible(false);
         setIsWorkerJoin(false);
+        setTargetChurchId(null);
       }
     };
 
@@ -79,6 +83,15 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     window.addEventListener('hashchange', checkHash);
     return () => window.removeEventListener('hashchange', checkHash);
   }, []);
+
+  // Compute available units based on target church ID
+  const targetChurch = useMemo(() => 
+    targetChurchId ? churches.find(c => c.id === targetChurchId) : null
+  , [targetChurchId, churches]);
+
+  const targetUnits = useMemo(() => 
+    targetChurchId ? units.filter(u => u.churchId === targetChurchId) : []
+  , [targetChurchId, units]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,7 +134,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             fullName: user.displayName || 'Worker',
             email: user.email || '',
             role: UserRole.WORKER,
-            unitId: selectedUnitId,
+            unitId: selectedUnitId || undefined,
             status: 'PENDING'
           });
           setIsPendingApproval(true);
@@ -201,9 +214,10 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
           fullName,
           email,
           role: UserRole.WORKER,
-          unitId: selectedUnitId,
+          unitId: selectedUnitId || undefined,
           status: 'PENDING'
         });
+        setIsPendingApproval(true);
       } else {
         // New church creation
         const church = addChurch({
@@ -226,7 +240,9 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
       // Important: Sign out to force "verify and login" flow
       await signOut(auth);
-      setVerificationEmail(email);
+      if (!isWorkerJoin) {
+        setVerificationEmail(email);
+      }
     } catch (error: any) {
       console.error(error);
       if (error.code === 'auth/email-already-in-use') {
@@ -238,9 +254,6 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       setLoading(false);
     }
   };
-
-  const targetChurch = targetChurchId ? churches.find(c => c.id === targetChurchId) : null;
-  const targetUnits = targetChurchId ? units.filter(u => u.churchId === targetChurchId) : [];
 
   // Reset Success Screen
   if (isResetSent) {
@@ -323,14 +336,17 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
            </div>
            <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Approval Pending</h2>
            <p className="text-slate-500 text-sm leading-relaxed mb-8">
-             Your account for <span className="font-bold text-indigo-600">{fullName || 'the church'}</span> has been created. 
-             An Admin will review your registration and grant access shortly. You can login once approved using your password.
+             Your account request for <span className="font-bold text-indigo-600">{fullName || targetChurch?.name || 'the church'}</span> has been received. 
+             An Admin will review your registration and grant access shortly. You will be able to login once approved.
            </p>
            <button 
-             onClick={() => setIsPendingApproval(false)}
+             onClick={() => {
+               setIsPendingApproval(false);
+               onBackToHome?.();
+             }}
              className="w-full bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all text-[10px] uppercase tracking-widest"
            >
-             Return to Login
+             Back to Home
            </button>
         </div>
       </div>
@@ -352,7 +368,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full lg:hidden"></div>
           <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tighter">Ecclesia</h1>
           <p className="text-indigo-200 text-sm lg:text-base opacity-80 uppercase tracking-widest font-bold">
-            {isWorkerJoin ? `Join ${targetChurch?.name || 'Church'}` : isSignup ? 'Create Church Account' : isForgotPassword ? 'Reset Security Credentials' : 'Church Management System'}
+            {isWorkerJoin ? `Join ${targetChurch?.name || 'Organization'}` : isSignup ? 'Create Church Account' : isForgotPassword ? 'Reset Security Credentials' : 'Church Management System'}
           </p>
         </div>
         
@@ -447,7 +463,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
               {isWorkerJoin ? (
                 <div className="space-y-5 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 animate-in zoom-in-95 duration-300">
-                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Worker Details</p>
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Worker Preferences</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Phone Number</label>
@@ -461,26 +477,33 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Target Unit</label>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Choose Department</label>
                       <select 
                         required
                         value={selectedUnitId}
                         onChange={(e) => setSelectedUnitId(e.target.value)}
-                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold"
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold cursor-pointer"
                       >
                         <option value="">Select Unit</option>
-                        {targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        {targetUnits.length > 0 ? (
+                          targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)
+                        ) : (
+                          <option value="GENERAL">General Registry</option>
+                        )}
                       </select>
                     </div>
                   </div>
+                  {targetUnits.length === 0 && targetChurchId && (
+                    <p className="text-[9px] text-slate-400 italic">Note: No specific units found. You'll be added to the general registry.</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-5 p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100 animate-in zoom-in-95 duration-300">
-                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Church Registry Details</p>
+                  <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Organization Registry</p>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="md:col-span-2">
-                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Church Legal Name</label>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Organization Name</label>
                       <input 
                         required
                         type="text" 
@@ -547,7 +570,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                 disabled={loading}
                 className="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 shadow-xl shadow-indigo-200 transition-all text-sm uppercase tracking-[0.2em] disabled:opacity-50"
               >
-                {loading ? 'Processing...' : (isWorkerJoin ? 'Request to Join' : 'Register Church')}
+                {loading ? 'Processing...' : (isWorkerJoin ? 'Request Membership' : 'Register Organization')}
               </button>
             </form>
           ) : (
