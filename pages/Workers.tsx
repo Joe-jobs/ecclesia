@@ -30,11 +30,21 @@ const Workers: React.FC = () => {
   };
 
   const handleCopyLink = () => {
-    if (!currentChurch) return;
-    const link = `${window.location.origin}${window.location.pathname}#join-worker?churchId=${currentChurch.id}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const churchId = currentChurch?.id || currentUser?.churchId;
+    if (!churchId) return;
+
+    // Construct link robustly by cleaning current URL of hashes and params
+    const baseUrl = window.location.href.split('#')[0].split('?')[0];
+    const link = `${baseUrl}#join-worker?churchId=${churchId}`;
+    
+    navigator.clipboard.writeText(link).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }).catch(err => {
+      console.error('Failed to copy link:', err);
+      // Fallback: simple alert if clipboard API fails
+      alert("Please copy this link manually: " + link);
+    });
   };
 
   const confirmDelete = () => {
@@ -194,7 +204,7 @@ const Workers: React.FC = () => {
                       <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
                         {user.role.replace('_', ' ')}
                       </p>
-                      <p className="text-[9px] text-indigo-500 font-bold uppercase">
+                      <p className="text-[9px] text-indigo-50 font-bold uppercase">
                         {units.find(u => u.id === user.unitId)?.name || 'General Registry'}
                       </p>
                     </div>
