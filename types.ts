@@ -45,6 +45,7 @@ export interface Church {
   adminId: string;
   createdAt: string;
   currency?: Currency;
+  status: 'ACTIVE' | 'SUSPENDED';
 }
 
 export interface User {

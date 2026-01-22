@@ -9,6 +9,7 @@ const Login: React.FC = () => {
   const [isWorkerJoin, setIsWorkerJoin] = useState(false);
   const [targetChurchId, setTargetChurchId] = useState<string | null>(null);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
+  const [isChurchSuspended, setIsChurchSuspended] = useState(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -70,9 +71,19 @@ const Login: React.FC = () => {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    if (user && user.status === 'PENDING') {
-      setIsPendingApproval(true);
-      return;
+    
+    if (user) {
+      // Check for suspended church
+      const church = churches.find(c => c.id === user.churchId);
+      if (church && church.status === 'SUSPENDED' && user.role !== UserRole.PLATFORM_OWNER) {
+        setIsChurchSuspended(true);
+        return;
+      }
+
+      if (user.status === 'PENDING') {
+        setIsPendingApproval(true);
+        return;
+      }
     }
     login(email, password);
   };
@@ -140,6 +151,28 @@ const Login: React.FC = () => {
 
   const targetChurch = targetChurchId ? churches.find(c => c.id === targetChurchId) : null;
   const targetUnits = targetChurchId ? units.filter(u => u.churchId === targetChurchId) : [];
+
+  if (isChurchSuspended) {
+    return (
+      <div className="min-h-screen bg-rose-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 lg:p-14 text-center animate-in zoom-in-95 duration-300">
+           <div className="w-24 h-24 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-8 text-rose-600 border-4 border-rose-200">
+             <span className="text-5xl">🔒</span>
+           </div>
+           <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Account Restricted</h2>
+           <p className="text-slate-500 text-sm leading-relaxed mb-8">
+             Access to this church portal has been <span className="font-bold text-rose-600">suspended</span> by the platform administration. Please contact support or your organization administrator for more details.
+           </p>
+           <button 
+             onClick={() => setIsChurchSuspended(false)}
+             className="w-full bg-slate-100 text-slate-600 font-black py-4 rounded-2xl hover:bg-slate-200 transition-all text-[10px] uppercase tracking-widest"
+           >
+             Return to Login
+           </button>
+        </div>
+      </div>
+    );
+  }
 
   if (isPendingApproval) {
     return (

@@ -3,11 +3,18 @@ import React from 'react';
 import { useApp } from '../store';
 
 const SuperAdmin: React.FC = () => {
-  const { churches, users, attendance, firstTimers } = useApp();
+  const { churches, users, attendance, firstTimers, toggleChurchStatus } = useApp();
 
   const totalUsers = users.length;
   const totalEntries = attendance.length;
   const totalFirstTimers = firstTimers.length;
+
+  const handleToggleStatus = (id: string, name: string, currentStatus: string) => {
+    const action = currentStatus === 'ACTIVE' ? 'suspend' : 'reactivate';
+    if (window.confirm(`Are you sure you want to ${action} the account for "${name}"?`)) {
+      toggleChurchStatus(id);
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -45,26 +52,29 @@ const SuperAdmin: React.FC = () => {
               <tr className="text-slate-400 text-[10px] uppercase tracking-widest font-black">
                 <th className="px-8 py-5">Church Entity</th>
                 <th className="px-8 py-5">Location</th>
-                <th className="px-8 py-5">Contact Phone</th>
+                <th className="px-8 py-5 text-center">Lifecycle Status</th>
                 <th className="px-8 py-5">Admin Email</th>
                 <th className="px-8 py-5">Onboarding</th>
-                <th className="px-8 py-5 text-right">Status</th>
+                <th className="px-8 py-5 text-right">System Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {churches.map(church => {
                 const admin = users.find(u => u.id === church.adminId);
+                const isSuspended = church.status === 'SUSPENDED';
                 return (
                   <tr key={church.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="px-8 py-5">
-                      <p className="font-black text-indigo-900 text-sm tracking-tight">{church.name}</p>
+                      <p className={`font-black text-sm tracking-tight ${isSuspended ? 'text-slate-400 line-through' : 'text-indigo-900'}`}>{church.name}</p>
                       <p className="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">ID: {church.id}</p>
                     </td>
                     <td className="px-8 py-5">
                       <p className="text-xs font-bold text-slate-600 tracking-tight">{church.location}</p>
                     </td>
-                    <td className="px-8 py-5">
-                      <p className="text-xs font-bold text-slate-600 tracking-tight">{church.phone || 'N/A'}</p>
+                    <td className="px-8 py-5 text-center">
+                      <span className={`px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest ${isSuspended ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                        {church.status}
+                      </span>
                     </td>
                     <td className="px-8 py-5">
                       <p className="text-xs font-bold text-indigo-600 tracking-tight lowercase">{admin?.email || 'No Admin Linked'}</p>
@@ -73,7 +83,12 @@ const SuperAdmin: React.FC = () => {
                       <p className="text-xs font-bold text-slate-500">{church.createdAt}</p>
                     </td>
                     <td className="px-8 py-5 text-right">
-                      <span className="bg-emerald-100 text-emerald-700 px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest">Verified</span>
+                      <button 
+                        onClick={() => handleToggleStatus(church.id, church.name, church.status)}
+                        className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md active:scale-95 ${isSuspended ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
+                      >
+                        {isSuspended ? 'Reactivate' : 'Suspend'}
+                      </button>
                     </td>
                   </tr>
                 );

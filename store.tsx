@@ -32,7 +32,7 @@ interface AppContextProps extends AppState {
   login: (email: string, password?: string) => void;
   logout: () => void;
   registerUser: (user: Omit<User, 'id'>) => User;
-  addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location'>) => Church;
+  addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location' | 'status'>) => Church;
   setCurrentChurchId: (id: string) => void;
   updateUser: (user: Partial<User>) => void;
   approveUser: (userId: string) => void;
@@ -58,6 +58,7 @@ interface AppContextProps extends AppState {
   addBudget: (b: Omit<Budget, 'id'>) => void;
   toggleAccountingAccess: (userId: string) => void;
   setChurchCurrency: (churchId: string, currency: Currency) => void;
+  toggleChurchStatus: (churchId: string) => void;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -72,6 +73,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       churches: Mocks.MOCK_CHURCHES.map(c => ({ 
         ...c, 
         currency: Currency.USD,
+        status: 'ACTIVE' as const,
         city: c.location.split(', ')[0] || '',
         state: c.location.split(', ')[1] || '',
         country: 'Nigeria', // Mock default
@@ -129,19 +131,38 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     setState(prev => ({ ...prev, currentUser: null, currentChurch: null }));
   };
 
-  const addChurch = (churchData: Omit<Church, 'id' | 'createdAt' | 'location'>) => {
+  const addChurch = (churchData: Omit<Church, 'id' | 'createdAt' | 'location' | 'status'>) => {
     const newChurch: Church = {
       ...churchData,
       id: 'c-' + Math.random().toString(36).substr(2, 9),
       createdAt: new Date().toISOString().split('T')[0],
       location: `${churchData.city}, ${churchData.state}`,
-      currency: Currency.USD
+      currency: Currency.USD,
+      status: 'ACTIVE'
     };
     setState(prev => ({
       ...prev,
       churches: [...prev.churches, newChurch]
     }));
     return newChurch;
+  };
+
+  const toggleChurchStatus = (churchId: string) => {
+    setState(prev => {
+      const updatedChurches = prev.churches.map(c => 
+        c.id === churchId ? { ...c, status: (c.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE') as any } : c
+      );
+      
+      const updatedCurrentChurch = prev.currentChurch?.id === churchId 
+        ? updatedChurches.find(c => c.id === churchId) || null 
+        : prev.currentChurch;
+
+      return {
+        ...prev,
+        churches: updatedChurches,
+        currentChurch: updatedCurrentChurch
+      };
+    });
   };
 
   const registerUser = (userData: Omit<User, 'id'>) => {
@@ -378,7 +399,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       addTransaction,
       addBudget,
       toggleAccountingAccess,
-      setChurchCurrency
+      setChurchCurrency,
+      toggleChurchStatus
     }}>
       {children}
     </AppContext.Provider>
