@@ -14,6 +14,8 @@ import Events from './pages/Events';
 import Accounting from './pages/Accounting';
 import Workers from './pages/Workers';
 import Login from './pages/Login';
+import Home from './pages/Home';
+import Pricing from './pages/Pricing';
 import { UserRole } from './types';
 
 const SuspendedScreen: React.FC = () => {
@@ -56,9 +58,51 @@ const SuspendedScreen: React.FC = () => {
 const AppContent: React.FC = () => {
   const { currentUser, currentChurch } = useApp();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [viewState, setViewState] = useState<'LANDING' | 'AUTH' | 'PRICING'>('LANDING');
+  const [initialSignupMode, setInitialSignupMode] = useState(false);
+
+  // If we are on the worker join link, we bypass landing and go straight to AUTH
+  React.useEffect(() => {
+    if (window.location.hash.startsWith('#join-worker') || window.location.hash === '#platform-vault') {
+      setViewState('AUTH');
+    }
+  }, []);
 
   if (!currentUser) {
-    return <Login />;
+    if (viewState === 'LANDING') {
+      return (
+        <Home 
+          onGetStarted={() => {
+            setInitialSignupMode(true);
+            setViewState('AUTH');
+          }}
+          onLogin={() => {
+            setInitialSignupMode(false);
+            setViewState('AUTH');
+          }}
+          onViewPricing={() => {
+            setViewState('PRICING');
+          }}
+        />
+      );
+    }
+    if (viewState === 'PRICING') {
+      return (
+        <Pricing 
+          onBack={() => setViewState('LANDING')} 
+          onGetStarted={() => {
+            setInitialSignupMode(true);
+            setViewState('AUTH');
+          }}
+        />
+      );
+    }
+    return (
+      <Login 
+        initialIsSignup={initialSignupMode} 
+        onBackToHome={() => setViewState('LANDING')}
+      />
+    );
   }
 
   // Check if the church is suspended and the user is NOT a platform owner

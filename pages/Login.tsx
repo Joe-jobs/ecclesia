@@ -3,9 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../store';
 import { UserRole } from '../types';
 
-const Login: React.FC = () => {
+interface LoginProps {
+  initialIsSignup?: boolean;
+  onBackToHome?: () => void;
+}
+
+const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) => {
   const { login, registerUser, addChurch, churches, units, users } = useApp();
-  const [isSignup, setIsSignup] = useState(false);
+  const [isSignup, setIsSignup] = useState(initialIsSignup);
   const [isWorkerJoin, setIsWorkerJoin] = useState(false);
   const [targetChurchId, setTargetChurchId] = useState<string | null>(null);
   const [isPendingApproval, setIsPendingApproval] = useState(false);
@@ -33,6 +38,11 @@ const Login: React.FC = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+
+  // Sync isSignup with initialIsSignup prop only on mount
+  useEffect(() => {
+    setIsSignup(initialIsSignup);
+  }, [initialIsSignup]);
 
   // Check for hash routes
   useEffect(() => {
@@ -262,6 +272,14 @@ const Login: React.FC = () => {
     <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4 lg:p-12 overflow-y-auto">
       <div className="bg-white rounded-[2rem] lg:rounded-[3rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col my-8">
         <div className="bg-indigo-900 p-8 lg:p-12 text-center text-white relative">
+          <div className="absolute top-4 left-4">
+            <button 
+              onClick={onBackToHome}
+              className="p-2 text-white/50 hover:text-white transition-colors text-xs font-black uppercase tracking-widest"
+            >
+              ← Home
+            </button>
+          </div>
           <div className="absolute top-4 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full lg:hidden"></div>
           <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tighter">Ecclesia</h1>
           <p className="text-indigo-200 text-sm lg:text-base opacity-80 uppercase tracking-widest font-bold">
