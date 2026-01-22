@@ -3,18 +3,11 @@ import React from 'react';
 import { useApp } from '../store';
 
 const SuperAdmin: React.FC = () => {
-  const { churches, users, attendance, firstTimers, toggleChurchStatus } = useApp();
+  const { churches, users, attendance, firstTimers } = useApp();
 
   const totalUsers = users.length;
   const totalEntries = attendance.length;
   const totalFirstTimers = firstTimers.length;
-
-  const handleToggleStatus = (id: string, name: string, currentStatus: string) => {
-    const action = currentStatus === 'ACTIVE' ? 'suspend' : 'reactivate';
-    if (window.confirm(`Are you sure you want to ${action} the account for "${name}"?`)) {
-      toggleChurchStatus(id);
-    }
-  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -54,8 +47,7 @@ const SuperAdmin: React.FC = () => {
                 <th className="px-8 py-5">Location</th>
                 <th className="px-8 py-5 text-center">Lifecycle Status</th>
                 <th className="px-8 py-5">Admin Email</th>
-                <th className="px-8 py-5">Onboarding</th>
-                <th className="px-8 py-5 text-right">System Actions</th>
+                <th className="px-8 py-5 text-right">Onboarding Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -79,16 +71,8 @@ const SuperAdmin: React.FC = () => {
                     <td className="px-8 py-5">
                       <p className="text-xs font-bold text-indigo-600 tracking-tight lowercase">{admin?.email || 'No Admin Linked'}</p>
                     </td>
-                    <td className="px-8 py-5">
-                      <p className="text-xs font-bold text-slate-500">{church.createdAt}</p>
-                    </td>
                     <td className="px-8 py-5 text-right">
-                      <button 
-                        onClick={() => handleToggleStatus(church.id, church.name, church.status)}
-                        className={`px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest transition-all shadow-md active:scale-95 ${isSuspended ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-rose-600 text-white hover:bg-rose-700'}`}
-                      >
-                        {isSuspended ? 'Reactivate' : 'Suspend'}
-                      </button>
+                      <p className="text-xs font-bold text-slate-500">{church.createdAt}</p>
                     </td>
                   </tr>
                 );
