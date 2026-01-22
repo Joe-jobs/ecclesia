@@ -62,7 +62,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
         setIsSecretVisible(true);
         setIsWorkerJoin(false);
       } else if (hash.startsWith('#join-worker')) {
-        // More robust parsing for hash parameters
+        // Robust parsing for hash parameters
         const queryString = hash.includes('?') ? hash.split('?')[1] : '';
         const params = new URLSearchParams(queryString);
         const churchId = params.get('churchId');
@@ -108,6 +108,8 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
         setLoading(false);
         return;
       }
+
+      // Local status check happens in App.tsx to handle multi-tenant/mock syncing
     } catch (error: any) {
       console.error(error);
       setAuthError("password or email incorrect");
@@ -127,20 +129,23 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       const existingUser = users.find(u => u.email === user.email);
       
       if (!existingUser) {
-        // If they are on a worker join page
         if (isWorkerJoin && targetChurchId) {
+          if (!selectedUnitId) {
+            setAuthError("Please select a department/unit before continuing.");
+            setLoading(false);
+            return;
+          }
           registerUser({
             churchId: targetChurchId,
             fullName: user.displayName || 'Worker',
             email: user.email || '',
             role: UserRole.WORKER,
-            unitId: selectedUnitId || undefined,
+            unitId: selectedUnitId,
             status: 'PENDING'
           });
           setIsPendingApproval(true);
           await signOut(auth);
         } 
-        // If they are trying to sign up a new church
         else if (isSignup) {
           const church = addChurch({
             name: newChurchName || `${user.displayName}'s Church`,
@@ -197,6 +202,11 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       return;
     }
 
+    if (isWorkerJoin && !selectedUnitId) {
+      setAuthError("Please select a department to join.");
+      return;
+    }
+
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -214,7 +224,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
           fullName,
           email,
           role: UserRole.WORKER,
-          unitId: selectedUnitId || undefined,
+          unitId: selectedUnitId,
           status: 'PENDING'
         });
         setIsPendingApproval(true);
@@ -334,10 +344,10 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
            <div className="w-24 h-24 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-8">
              <span className="text-5xl">⏳</span>
            </div>
-           <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Approval Pending</h2>
+           <h2 className="text-2xl font-black text-slate-800 mb-4 tracking-tight uppercase">Request Received</h2>
            <p className="text-slate-500 text-sm leading-relaxed mb-8">
-             Your account request for <span className="font-bold text-indigo-600">{fullName || targetChurch?.name || 'the church'}</span> has been received. 
-             An Admin will review your registration and grant access shortly. You will be able to login once approved.
+             Your registration for <span className="font-bold text-indigo-600">{targetChurch?.name || 'the church'}</span> is pending. 
+             An administrator will review your application and approve your access shortly. You will be able to log in once approved.
            </p>
            <button 
              onClick={() => {
@@ -477,14 +487,14 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Choose Department</label>
+                      <label className="block text-[10px] font-black text-slate-500 mb-1.5 uppercase">Target Unit/Department</label>
                       <select 
                         required
                         value={selectedUnitId}
                         onChange={(e) => setSelectedUnitId(e.target.value)}
-                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold cursor-pointer"
+                        className="w-full px-5 py-3 bg-white border border-slate-200 rounded-xl focus:border-indigo-500 focus:outline-none text-sm font-bold cursor-pointer transition-all hover:border-indigo-300 shadow-sm"
                       >
-                        <option value="">Select Unit</option>
+                        <option value="">-- Choose Unit --</option>
                         {targetUnits.length > 0 ? (
                           targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)
                         ) : (
@@ -494,7 +504,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                     </div>
                   </div>
                   {targetUnits.length === 0 && targetChurchId && (
-                    <p className="text-[9px] text-slate-400 italic">Note: No specific units found. You'll be added to the general registry.</p>
+                    <p className="text-[9px] text-slate-400 italic">No specific units found for this organization. You will join the General Registry.</p>
                   )}
                 </div>
               ) : (

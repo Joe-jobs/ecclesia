@@ -18,6 +18,43 @@ import Home from './pages/Home';
 import Pricing from './pages/Pricing';
 import { UserRole } from './types';
 
+const PendingApprovalScreen: React.FC = () => {
+  const { logout, currentUser, currentChurch } = useApp();
+  
+  return (
+    <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-lg p-10 lg:p-16 text-center animate-in zoom-in-95 duration-500 border border-slate-100">
+        <div className="w-24 h-24 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-10 border-4 border-amber-100 shadow-inner">
+          <span className="text-5xl">⏳</span>
+        </div>
+        
+        <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tighter uppercase leading-none">
+          Approval Required
+        </h2>
+        
+        <div className="space-y-4 mb-10">
+          <p className="text-slate-500 text-sm leading-relaxed font-medium">
+            Hello, <span className="font-bold text-slate-900">{currentUser?.fullName}</span>. Your account for <span className="font-bold text-indigo-600">{currentChurch?.name || 'the organization'}</span> is currently pending approval.
+          </p>
+          <div className="p-4 bg-slate-50 rounded-2xl text-[11px] text-slate-400 font-bold uppercase tracking-widest leading-loose">
+            An administrator must verify your registration before you can access the management dashboard.
+          </div>
+          <p className="text-slate-400 text-[10px] font-medium italic">
+            Please notify your organization's admin or check back later. Once approved, you will have full access to your assigned units.
+          </p>
+        </div>
+
+        <button 
+          onClick={logout}
+          className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-slate-800 transition-all text-[11px] uppercase tracking-[0.3em] shadow-xl shadow-slate-200 active:scale-95"
+        >
+          Return to Sign In
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const SuspendedScreen: React.FC = () => {
   const { logout, currentChurch } = useApp();
   
@@ -105,8 +142,13 @@ const AppContent: React.FC = () => {
     );
   }
 
-  // Check if the church is suspended and the user is NOT a platform owner
+  // Permission and Status Checks
+  const isPending = currentUser.status === 'PENDING';
   const isSuspended = currentChurch?.status === 'SUSPENDED' && currentUser.role !== UserRole.PLATFORM_OWNER;
+
+  if (isPending) {
+    return <PendingApprovalScreen />;
+  }
 
   if (isSuspended) {
     return <SuspendedScreen />;
