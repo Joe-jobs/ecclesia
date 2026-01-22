@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface PricingProps {
   onBack: () => void;
@@ -7,6 +7,11 @@ interface PricingProps {
 }
 
 const Pricing: React.FC<PricingProps> = ({ onBack, onGetStarted }) => {
+  // Ensure page starts at the top when loaded
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 selection:bg-indigo-100 selection:text-indigo-900 overflow-x-hidden">
       {/* Navigation */}
