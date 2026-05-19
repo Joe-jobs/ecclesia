@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
-import { useApp } from '../store';
-import { UserRole } from '../types';
+import { useApp } from '../store.tsx';
+import { UserRole } from '../types.ts';
 
 interface LayoutProps {
   children: React.ReactNode;

@@ -1,8 +1,7 @@
-
 import React from 'react';
-import { useApp } from '../store';
+import { useApp } from '../store.tsx';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TaskStatus } from '../types';
+import { TaskStatus } from '../types.ts';
 
 const Dashboard: React.FC = () => {
   const { currentUser, attendance, firstTimers, tasks, announcements, events } = useApp();

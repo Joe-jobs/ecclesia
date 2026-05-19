@@ -1,15 +1,16 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { FollowUpStatus, FirstTimer, UserRole } from '../types';
-import { getFollowUpStrategy } from '../geminiService';
+import { useApp } from '../store.tsx';
+import { FollowUpStatus, FirstTimer, UserRole } from '../types.ts';
+import { getFollowUpStrategy, getWarmMessage } from '../geminiService.ts';
 
 const FirstTimers: React.FC = () => {
   const { firstTimers, currentUser, addFirstTimer, updateFirstTimer, users } = useApp();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingFT, setEditingFT] = useState<FirstTimer | null>(null);
   const [strategyLoading, setStrategyLoading] = useState<string | null>(null);
-  const [strategyContent, setStrategyContent] = useState<string | null>(null);
+  const [strategyContent, setStrategyContent] = useState<{strategy: string, warmMessages: string[], visitor: FirstTimer} | null>(null);
+  const [editedMessages, setEditedMessages] = useState<string[]>([]);
+  const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
 
   const churchFTs = firstTimers.filter(ft => ft.churchId === currentUser?.churchId);
   const churchWorkers = users.filter(u => u.churchId === currentUser?.churchId && u.status === 'APPROVED');
@@ -27,8 +28,13 @@ const FirstTimers: React.FC = () => {
     if (!canUpdateFTStatus(ft)) return;
     setStrategyLoading(ft.id);
     setStrategyContent(null);
-    const strategy = await getFollowUpStrategy(ft.notes, ft.fullName);
-    setStrategyContent(strategy);
+    setEditingMessageIndex(null);
+    const [strategy, warmMessages] = await Promise.all([
+      getFollowUpStrategy(ft.notes, ft.fullName),
+      getWarmMessage(ft.fullName)
+    ]);
+    setStrategyContent({ strategy, warmMessages, visitor: ft });
+    setEditedMessages(warmMessages);
     setStrategyLoading(null);
     window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   };
@@ -292,10 +298,51 @@ const FirstTimers: React.FC = () => {
                 ✕
               </button>
             </div>
-            <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 lg:p-8 rounded-3xl text-sm lg:text-lg leading-relaxed text-slate-100 font-medium">
-              {strategyContent.split('\n').map((line, i) => (
-                <p key={i} className="mb-2">{line}</p>
-              ))}
+            <div className="space-y-6">
+              <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 lg:p-8 rounded-3xl text-sm lg:text-lg leading-relaxed text-slate-100 font-medium">
+                <h5 className="font-black text-indigo-300 mb-4 uppercase text-xs tracking-widest">Follow-up Strategy</h5>
+                {strategyContent.strategy.split('\n').map((line, i) => (
+                  <p key={i} className="mb-2">{line}</p>
+                ))}
+              </div>
+              <div className="space-y-4">
+                 <h5 className="font-black text-indigo-200 uppercase text-xs tracking-widest pl-2">Suggested Message Options</h5>
+                 {editedMessages.map((message, index) => (
+                   <div key={index} className="bg-white/10 p-6 rounded-3xl border border-white/20">
+                     <div className="flex justify-between items-center mb-4">
+                        <span className="font-black text-indigo-200 uppercase text-[10px] tracking-widest">Option {index + 1}</span>
+                         <button 
+                          onClick={() => setEditingMessageIndex(editingMessageIndex === index ? null : index)}
+                          className="text-xs font-black bg-white/20 px-3 py-1 rounded-xl hover:bg-white/30 transition-all uppercase tracking-wider text-white"
+                        >
+                          {editingMessageIndex === index ? 'Save' : 'Edit'}
+                        </button>
+                        <a 
+                          href={`https://wa.me/${strategyContent.visitor.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs font-black bg-emerald-500 px-3 py-1 rounded-xl hover:bg-emerald-600 transition-all uppercase tracking-wider text-white ml-2"
+                        >
+                          WhatsApp
+                        </a>
+                     </div>
+                     {editingMessageIndex === index ? (
+                       <textarea
+                         value={message}
+                         onChange={(e) => {
+                           const newMessages = [...editedMessages];
+                           newMessages[index] = e.target.value;
+                           setEditedMessages(newMessages);
+                         }}
+                         className="w-full bg-white/10 p-4 rounded-2xl border border-white/20 text-white font-medium focus:outline-none focus:ring-2 focus:ring-white/50"
+                         rows={3}
+                       />
+                     ) : (
+                       <p className="italic whitespace-pre-wrap text-white">"{message}"</p>
+                     )}
+                   </div>
+                 ))}
+              </div>
             </div>
           </div>
         </div>

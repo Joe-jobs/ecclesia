@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { UserRole, Announcement, Unit } from '../types';
+import { useApp } from '../store.tsx';
+import { UserRole, Announcement, Unit } from '../types.ts';
 
 const Announcements: React.FC = () => {
   const { announcements, units, currentUser, addAnnouncement, deleteAnnouncement } = useApp();

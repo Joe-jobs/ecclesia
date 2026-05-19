@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp, EXCHANGE_RATES } from '../store';
-import { UserRole, Transaction, Budget, Currency } from '../types';
+import { useApp, EXCHANGE_RATES } from '../store.tsx';
+import { UserRole, Transaction, Budget, Currency } from '../types.ts';
 
 const Accounting: React.FC = () => {
   const { 

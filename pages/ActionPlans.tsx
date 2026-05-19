@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { TaskStatus, Priority, UserRole, ActionPlan } from '../types';
+import { useApp } from '../store.tsx';
+import { TaskStatus, Priority, UserRole, ActionPlan } from '../types.ts';
 
 const ActionPlans: React.FC = () => {
   const { tasks, currentUser, users, units, addTask, updateTask } = useApp();

@@ -1,6 +1,5 @@
-
 import React from 'react';
-import { useApp } from '../store';
+import { useApp } from '../store.tsx';
 
 const SuperAdmin: React.FC = () => {
   const { churches, users, attendance, firstTimers } = useApp();

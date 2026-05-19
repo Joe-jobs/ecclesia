@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { User, UserRole } from '../types';
+import { useApp } from '../store.tsx';
+import { User, UserRole } from '../types.ts';
 
 const Workers: React.FC = () => {
   const { currentUser, currentChurch, users, approveUser, deleteUser, units } = useApp();

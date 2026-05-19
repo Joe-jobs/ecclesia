@@ -1,9 +1,8 @@
-
-import { UserRole, FollowUpStatus, TaskStatus, Priority } from './types';
+import { UserRole, FollowUpStatus, TaskStatus, Priority } from './types.ts';
 
 export const MOCK_CHURCHES = [
-  { id: 'c1', name: 'Grace Fellowship Center', location: 'Lagos, Nigeria', adminId: 'u2', createdAt: '2023-01-10' },
-  { id: 'c2', name: 'Victory Chapel Int\'l', location: 'Houston, TX', adminId: 'u5', createdAt: '2023-05-20' }
+  { id: 'c1', name: 'Grace Fellowship Center', location: 'Lagos, Nigeria', adminId: 'u2', createdAt: '2023-01-10', status: 'ACTIVE' },
+  { id: 'c2', name: 'Victory Chapel Int\'l', location: 'Houston, TX', adminId: 'u5', createdAt: '2023-05-20', status: 'ACTIVE' }
 ];
 
 export const MOCK_USERS = [

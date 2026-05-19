@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { UserRole, Property, Unit } from '../types';
+import { useApp } from '../store.tsx';
+import { UserRole, Property, Unit } from '../types.ts';
 
 const Properties: React.FC = () => {
   const { properties, units, currentUser, addProperty, updateProperty, deleteProperty } = useApp();

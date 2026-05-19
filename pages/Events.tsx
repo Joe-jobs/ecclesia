@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
-import { UserRole, ChurchEvent } from '../types';
+import { useApp } from '../store.tsx';
+import { UserRole, ChurchEvent } from '../types.ts';
 
 const Events: React.FC = () => {
   const { events, currentUser, addEvent, updateEvent, deleteEvent } = useApp();

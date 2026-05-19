@@ -1,6 +1,5 @@
-
 import React, { useState } from 'react';
-import { useApp } from '../store';
+import { useApp } from '../store.tsx';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const Attendance: React.FC = () => {
