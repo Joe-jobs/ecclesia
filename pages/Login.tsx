@@ -140,11 +140,11 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
   if (isPendingApproval) {
     return (
       <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 text-center">
-           <div className="w-20 h-20 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">⏳</div>
-           <h2 className="text-2xl font-black text-slate-800 mb-4">Pending Approval</h2>
-           <p className="text-slate-500 text-sm mb-8">An admin will review your request shortly.</p>
-           <button onClick={onBackToHome} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-xs">Return to Home</button>
+        <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center border border-slate-100">
+           <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-3xl">⏳</div>
+           <h2 className="text-xl font-black text-slate-800 mb-2">Pending Approval</h2>
+           <p className="text-slate-500 text-xs mb-6 leading-relaxed">An admin will review your request shortly.</p>
+           <button onClick={onBackToHome} className="w-full bg-slate-900 text-white font-black py-3 rounded-xl uppercase tracking-wider text-xs hover:bg-slate-800 transition-colors">Return to Home</button>
         </div>
       </div>
     );
@@ -153,11 +153,11 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
   if (isResetSent) {
     return (
       <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-md p-10 text-center">
-           <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-8 text-4xl">✉️</div>
-           <h2 className="text-2xl font-black text-slate-800 mb-4">Reset Sent</h2>
-           <p className="text-slate-500 text-sm mb-8">Instructions have been sent to your email.</p>
-           <button onClick={() => setIsResetSent(false)} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl">Back to Login</button>
+        <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center border border-slate-100">
+           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-3xl">✉️</div>
+           <h2 className="text-xl font-black text-slate-800 mb-2">Reset Sent</h2>
+           <p className="text-slate-500 text-xs mb-6 leading-relaxed">Instructions have been sent to your email.</p>
+           <button onClick={() => setIsResetSent(false)} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider hover:bg-indigo-700 transition-colors">Back to Login</button>
         </div>
       </div>
     );
@@ -165,59 +165,107 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
   return (
     <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-2xl overflow-hidden">
-        <div className="bg-indigo-900 p-8 text-center text-white relative">
-          <h1 className="text-3xl lg:text-5xl font-black mb-2 tracking-tighter">Ecclesia</h1>
-          <p className="text-indigo-200 text-[10px] uppercase tracking-widest font-bold">Simulated Local Environment</p>
+      <div className="bg-white rounded-3xl shadow-xl w-full max-w-md overflow-hidden border border-slate-100 transition-all">
+        <div className="bg-indigo-900 p-6 text-center text-white relative">
+          {onBackToHome && (
+            <button 
+              onClick={onBackToHome}
+              type="button"
+              className="absolute top-4 left-4 text-indigo-200 hover:text-white text-xs font-bold flex items-center gap-1 transition-colors"
+            >
+              ← Home
+            </button>
+          )}
+          <h1 className="text-2xl lg:text-3xl font-black mb-1 tracking-tight">Ecclesia</h1>
+          <p className="text-indigo-200 text-[10px] uppercase tracking-widest font-bold">
+            {isSignup ? 'Create Church Portal' : 'Sign In To Portal'}
+          </p>
         </div>
-        <div className="p-8 lg:p-12">
-          {authError && <div className="mb-6 p-4 bg-rose-50 text-rose-600 text-xs font-bold rounded-xl text-center">{authError}</div>}
+        <div className="p-6 sm:p-8">
+          {authError && <div className="mb-4 p-3 bg-rose-50 text-rose-600 text-xs font-bold rounded-xl text-center">{authError}</div>}
           
           {isForgotPassword ? (
-            <form onSubmit={handleForgotPassword} className="space-y-4">
-               <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 border rounded-xl" />
-               <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl uppercase">Send Reset Link</button>
-               <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-slate-400 text-xs font-bold uppercase">Back to Login</button>
+            <form onSubmit={handleForgotPassword} className="space-y-3">
+               <div>
+                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                 <input required type="email" placeholder="email@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+               </div>
+               <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider hover:bg-indigo-700 transition-colors">Send Reset Link</button>
+               <button type="button" onClick={() => setIsForgotPassword(false)} className="w-full text-slate-400 text-xs font-bold uppercase hover:text-slate-600">Back to Login</button>
             </form>
           ) : isSignup ? (
-            <form onSubmit={handleSignup} className="space-y-4">
-              <input required placeholder="Full Name" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-4 border rounded-xl" />
-              <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 border rounded-xl" />
-              <div className="grid grid-cols-2 gap-4">
-                <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border rounded-xl" />
-                <input required type="password" placeholder="Confirm" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-4 border rounded-xl" />
+            <form onSubmit={handleSignup} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
+                <input required placeholder="John Doe" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                <input required type="email" placeholder="admin@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                  <input required type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Confirm</label>
+                  <input required type="password" placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                </div>
               </div>
               {isWorkerJoin && (
-                <select required value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} className="w-full p-4 border rounded-xl">
-                  <option value="">Select Unit</option>
-                  {targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                </select>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Unit</label>
+                  <select required value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white">
+                    <option value="">Select Unit</option>
+                    {targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
               )}
               {!isWorkerJoin && (
-                <div className="space-y-4">
-                   <input required placeholder="Church Name" value={newChurchName} onChange={e => setNewChurchName(e.target.value)} className="w-full p-4 border rounded-xl" />
-                   <div className="grid grid-cols-2 gap-4">
-                      <input required placeholder="City" value={churchCity} onChange={e => setChurchCity(e.target.value)} className="w-full p-4 border rounded-xl" />
-                      <input required placeholder="State" value={churchState} onChange={e => setChurchState(e.target.value)} className="w-full p-4 border rounded-xl" />
+                <div className="space-y-3">
+                   <div>
+                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Church Name</label>
+                     <input required placeholder="Grace Community Church" value={newChurchName} onChange={e => setNewChurchName(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                   </div>
+                   <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">City</label>
+                        <input required placeholder="Dallas" value={churchCity} onChange={e => setChurchCity(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">State</label>
+                        <input required placeholder="TX" value={churchState} onChange={e => setChurchState(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                      </div>
                    </div>
                 </div>
               )}
-              <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Processing...' : 'Register'}</button>
+              <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl uppercase text-xs tracking-wider hover:bg-indigo-700 transition-colors mt-2">
+                {loading ? 'Processing...' : 'Register Portal'}
+              </button>
             </form>
           ) : (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <input required type="email" placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-4 border rounded-xl" />
-              <input required type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-4 border rounded-xl" />
-              <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl uppercase">{loading ? 'Authenticating...' : 'Login'}</button>
-              <div className="text-right">
+            <form onSubmit={handleLogin} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                <input required type="email" placeholder="admin@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
+                <input required type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+              </div>
+              <div className="flex justify-end">
                  <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-indigo-600 hover:underline">Forgot Password?</button>
               </div>
+              <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl uppercase text-xs tracking-wider hover:bg-indigo-700 transition-colors">
+                {loading ? 'Authenticating...' : 'Sign In'}
+              </button>
             </form>
           )}
           
-          <div className="mt-8 text-center border-t pt-8">
-             <button onClick={() => setIsSignup(!isSignup)} className="text-xs font-bold text-slate-500 uppercase tracking-widest hover:text-indigo-600">
-               {isSignup ? 'Already have an account? Login' : 'New Church? Create Portal'}
+          <div className="mt-6 text-center border-t border-slate-100 pt-5">
+             <button onClick={() => setIsSignup(!isSignup)} className="text-xs font-bold text-slate-500 uppercase tracking-wider hover:text-indigo-600 transition-colors">
+               {isSignup ? 'Already have an account? Sign In' : 'New Church? Create Portal'}
              </button>
           </div>
         </div>
