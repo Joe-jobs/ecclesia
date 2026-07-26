@@ -40,6 +40,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
     { id: 'inventory', label: 'Properties', icon: '📦', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD] },
     { id: 'announcements', label: 'Announcements', icon: '📢', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
     { id: 'events', label: 'Events & Calendar', icon: '📅', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
+    { id: 'gmail', label: 'Gmail Outreach', icon: '✉️', roles: [UserRole.CHURCH_ADMIN, UserRole.UNIT_HEAD, UserRole.WORKER] },
     { 
       id: 'accounting', 
       label: 'Financials', 

@@ -12,6 +12,7 @@ import Announcements from './pages/Announcements.tsx';
 import Events from './pages/Events.tsx';
 import Accounting from './pages/Accounting.tsx';
 import Workers from './pages/Workers.tsx';
+import { GmailOutreach } from './pages/GmailOutreach.tsx';
 import Login from './pages/Login.tsx';
 import Home from './pages/Home.tsx';
 import Pricing from './pages/Pricing.tsx';
@@ -107,6 +108,7 @@ const AppContent: React.FC = () => {
       case 'inventory': return <Properties />;
       case 'announcements': return <Announcements />;
       case 'events': return <Events />;
+      case 'gmail': return <GmailOutreach />;
       case 'accounting': return <Accounting />;
       case 'workers': return <Workers />;
       default: return <Dashboard />;

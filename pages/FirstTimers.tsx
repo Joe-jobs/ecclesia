@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../store.tsx';
 import { FollowUpStatus, FirstTimer, UserRole } from '../types.ts';
 import { getFollowUpStrategy, getWarmMessage } from '../geminiService.ts';
+import { GmailSendModal } from '../components/GmailSendModal.tsx';
 
 const FirstTimers: React.FC = () => {
   const { firstTimers, currentUser, addFirstTimer, updateFirstTimer, users } = useApp();
@@ -11,6 +12,18 @@ const FirstTimers: React.FC = () => {
   const [strategyContent, setStrategyContent] = useState<{strategy: string, warmMessages: string[], visitor: FirstTimer} | null>(null);
   const [editedMessages, setEditedMessages] = useState<string[]>([]);
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null);
+
+  const [gmailModalState, setGmailModalState] = useState<{
+    isOpen: boolean;
+    to: string;
+    subject: string;
+    body: string;
+  }>({
+    isOpen: false,
+    to: '',
+    subject: '',
+    body: '',
+  });
 
   const churchFTs = firstTimers.filter(ft => ft.churchId === currentUser?.churchId);
   const churchWorkers = users.filter(u => u.churchId === currentUser?.churchId && u.status === 'APPROVED');
@@ -317,14 +330,27 @@ const FirstTimers: React.FC = () => {
                         >
                           {editingMessageIndex === index ? 'Save' : 'Edit'}
                         </button>
-                        <a 
-                          href={`https://wa.me/${strategyContent.visitor.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs font-black bg-emerald-500 px-3 py-1 rounded-xl hover:bg-emerald-600 transition-all uppercase tracking-wider text-white ml-2"
-                        >
-                          WhatsApp
-                        </a>
+                         <div className="flex items-center gap-2">
+                           <a 
+                             href={`https://wa.me/${strategyContent.visitor.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`}
+                             target="_blank"
+                             rel="noopener noreferrer"
+                             className="text-xs font-black bg-emerald-500 px-3 py-1 rounded-xl hover:bg-emerald-600 transition-all uppercase tracking-wider text-white"
+                           >
+                             WhatsApp
+                           </a>
+                           <button 
+                             onClick={() => setGmailModalState({
+                               isOpen: true,
+                               to: strategyContent.visitor.email || '',
+                               subject: `Welcome to Ecclesia Church, ${strategyContent.visitor.fullName}!`,
+                               body: message
+                             })}
+                             className="text-xs font-black bg-red-500 px-3 py-1 rounded-xl hover:bg-red-600 transition-all uppercase tracking-wider text-white"
+                           >
+                             ✉️ Gmail
+                           </button>
+                         </div>
                      </div>
                      {editingMessageIndex === index ? (
                        <textarea
@@ -460,6 +486,14 @@ const FirstTimers: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Gmail Send Modal */}
+      <GmailSendModal 
+        isOpen={gmailModalState.isOpen}
+        onClose={() => setGmailModalState(prev => ({ ...prev, isOpen: false }))}
+        initialTo={gmailModalState.to}
+        initialSubject={gmailModalState.subject}
+        initialBody={gmailModalState.body}
+      />
     </div>
   );
 };
