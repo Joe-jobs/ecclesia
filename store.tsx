@@ -63,6 +63,7 @@ interface AppContextProps extends AppState {
   setChurchCurrency: (churchId: string, currency: Currency) => Promise<void>;
   toggleChurchStatus: (churchId: string) => Promise<void>;
   setCurrentUser: (user: User | null) => void;
+  resetPassword: (userEmail: string, newPass: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -451,6 +452,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }));
   };
 
+  const resetPassword = async (userEmail: string, newPass: string) => {
+    const target = state.users.find(u => u.email.toLowerCase() === userEmail.toLowerCase());
+    if (target) {
+      const updatedUser = { ...target, password: newPass };
+      try {
+        await setDoc(doc(db, 'users', target.id), { password: newPass }, { merge: true });
+      } catch (err) {
+        console.error('Error updating password in Firestore:', err);
+      }
+      setState(prev => ({
+        ...prev,
+        users: prev.users.map(u => u.id === target.id ? updatedUser : u),
+        currentUser: prev.currentUser?.id === target.id ? updatedUser : prev.currentUser
+      }));
+      return true;
+    }
+    return false;
+  };
+
   const updateUser = async (user: Partial<User>) => {
     if (state.currentUser) {
       const updatedUser = { ...state.currentUser, ...user };
@@ -497,7 +517,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       toggleAccountingAccess,
       setChurchCurrency,
       toggleChurchStatus,
-      setCurrentUser
+      setCurrentUser,
+      resetPassword
     }}>
       {children}
     </AppContext.Provider>
