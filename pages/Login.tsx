@@ -95,6 +95,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             churchId: targetChurchId,
             fullName,
             email,
+            phone,
             role: UserRole.WORKER,
             unitId: selectedUnitId,
             status: 'PENDING'
@@ -113,6 +114,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             churchId: church.id,
             fullName,
             email,
+            phone,
             role: UserRole.CHURCH_ADMIN,
             status: 'APPROVED'
           });
@@ -200,6 +202,10 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                 <input required placeholder="John Doe" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
               </div>
               <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Phone Number</label>
+                <input required type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={e => setPhone(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+              </div>
+              <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
                 <input required type="email" placeholder="admin@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
               </div>
@@ -227,6 +233,10 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                    <div>
                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Church Name</label>
                      <input required placeholder="Grace Community Church" value={newChurchName} onChange={e => setNewChurchName(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                   </div>
+                   <div>
+                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Country</label>
+                     <input required placeholder="United States" value={churchCountry} onChange={e => setChurchCountry(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
                    </div>
                    <div className="grid grid-cols-2 gap-3">
                       <div>

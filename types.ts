@@ -53,6 +53,7 @@ export interface User {
   churchId: string;
   fullName: string;
   email: string;
+  phone?: string;
   password?: string; // Added for simulated login
   role: UserRole;
   unitId?: string;
