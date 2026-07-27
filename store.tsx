@@ -354,7 +354,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const addUnit = async (unit: Omit<Unit, 'id'>) => {
     const id = 'un-' + Math.random().toString(36).substring(2, 11);
-    setState(prev => ({ ...prev, units: [...prev.units, { ...unit, id }] }));
+    const newUnit: Unit = { ...unit, id };
+    try {
+      await setDoc(doc(db, 'units', id), newUnit);
+    } catch (err) {
+      console.error('Error saving unit to Firestore:', err);
+    }
+    setState(prev => ({ ...prev, units: [...prev.units, newUnit] }));
+    return newUnit;
   };
 
   const updateUnit = async (id: string, updates: Partial<Unit>) => {

@@ -2,8 +2,21 @@ import React, { useState } from 'react';
 import { useApp } from '../store.tsx';
 import { User, UserRole } from '../types.ts';
 
+const DEFAULT_STAFF_UNITS = [
+  { id: 'def-media', name: 'Media & IT Unit' },
+  { id: 'def-hospitality', name: 'Hospitality & Ushering Unit' },
+  { id: 'def-choir', name: 'Choir & Music Ministry' },
+  { id: 'def-protocol', name: 'Protocol & Security Unit' },
+  { id: 'def-greeters', name: 'Greeters & Sanctuary Unit' },
+  { id: 'def-children', name: 'Children Ministry' },
+  { id: 'def-youth', name: 'Youth & Student Ministry' },
+  { id: 'def-welfare', name: 'Welfare & Care Team' },
+  { id: 'def-prayer', name: 'Prayer & Intercession Unit' },
+  { id: 'def-sanitation', name: 'Sanitation & Maintenance' }
+];
+
 const Workers: React.FC = () => {
-  const { currentUser, currentChurch, users, approveUser, deleteUser, units } = useApp();
+  const { currentUser, currentChurch, users, approveUser, deleteUser, units, registerUser, addUnit } = useApp();
   const [copied, setCopied] = useState(false);
   const [filter, setFilter] = useState<'ALL' | 'APPROVED' | 'PENDING'>('ALL');
   const [search, setSearch] = useState('');
@@ -11,9 +24,23 @@ const Workers: React.FC = () => {
   
   // Custom Modal State
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
-  // Get all users for this church except the current user (admin cannot delete themselves)
-  const churchUsers = users.filter(u => u.churchId === currentUser?.churchId && u.id !== currentUser?.id);
+  // New Staff Form State
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffPhone, setNewStaffPhone] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState<UserRole>(UserRole.WORKER);
+  const [newStaffUnitId, setNewStaffUnitId] = useState('');
+  const [newStaffStatus, setNewStaffStatus] = useState<'APPROVED' | 'PENDING'>('APPROVED');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const activeChurchId = currentChurch?.id || currentUser?.churchId;
+  const churchUnits = units.filter(u => u.churchId === activeChurchId);
+  const availableUnits = churchUnits.length > 0 ? churchUnits : DEFAULT_STAFF_UNITS;
+
+  // Get all users for this church except the current user
+  const churchUsers = users.filter(u => u.churchId === activeChurchId && u.id !== currentUser?.id);
   
   const filteredWorkers = churchUsers.filter(u => {
     const matchesFilter = filter === 'ALL' || u.status === filter;
@@ -29,21 +56,64 @@ const Workers: React.FC = () => {
   };
 
   const handleCopyLink = () => {
-    const churchId = currentChurch?.id || currentUser?.churchId;
-    if (!churchId) return;
+    if (!activeChurchId) return;
 
-    // Construct link robustly by cleaning current URL of hashes and params
     const baseUrl = window.location.href.split('#')[0].split('?')[0];
-    const link = `${baseUrl}#join-worker?churchId=${churchId}`;
+    const link = `${baseUrl}#join-worker?churchId=${activeChurchId}`;
     
     navigator.clipboard.writeText(link).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(err => {
       console.error('Failed to copy link:', err);
-      // Fallback: simple alert if clipboard API fails
       alert("Please copy this link manually: " + link);
     });
+  };
+
+  const handleAddStaffSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!activeChurchId) return;
+    setIsSubmitting(true);
+    try {
+      let finalUnitId = newStaffUnitId;
+      if (newStaffUnitId.startsWith('def-')) {
+        const matchedDef = DEFAULT_STAFF_UNITS.find(d => d.id === newStaffUnitId);
+        if (matchedDef) {
+          const createdUnit = await addUnit({
+            churchId: activeChurchId,
+            name: matchedDef.name,
+            headIds: []
+          });
+          finalUnitId = createdUnit.id;
+        }
+      }
+
+      await registerUser({
+        churchId: activeChurchId,
+        fullName: newStaffName,
+        email: newStaffEmail,
+        phone: newStaffPhone,
+        role: newStaffRole,
+        unitId: finalUnitId || undefined,
+        status: newStaffStatus
+      });
+
+      setDeleteSuccess(`${newStaffName} registered successfully!`);
+      setTimeout(() => setDeleteSuccess(null), 3000);
+
+      // Reset Form
+      setNewStaffName('');
+      setNewStaffEmail('');
+      setNewStaffPhone('');
+      setNewStaffUnitId('');
+      setNewStaffRole(UserRole.WORKER);
+      setNewStaffStatus('APPROVED');
+      setIsAddModalOpen(false);
+    } catch (err) {
+      console.error('Error registering staff:', err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const confirmDelete = () => {
@@ -96,6 +166,73 @@ const Workers: React.FC = () => {
         </div>
       )}
 
+      {/* Add Staff Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="relative bg-white rounded-[2.5rem] w-full max-w-lg p-8 lg:p-10 shadow-2xl animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight">Register Staff Member</h3>
+                <p className="text-xs font-medium text-slate-500">Add a worker to the church staff registry.</p>
+              </div>
+              <button onClick={() => setIsAddModalOpen(false)} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold flex items-center justify-center text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleAddStaffSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
+                <input required placeholder="Jane Doe" value={newStaffName} onChange={e => setNewStaffName(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
+                <input required type="email" placeholder="jane@church.org" value={newStaffEmail} onChange={e => setNewStaffEmail(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Phone Number</label>
+                <input required type="tel" placeholder="+1 (555) 000-0000" value={newStaffPhone} onChange={e => setNewStaffPhone(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Staff Role</label>
+                  <select value={newStaffRole} onChange={e => setNewStaffRole(e.target.value as UserRole)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                    <option value={UserRole.WORKER}>Worker</option>
+                    <option value={UserRole.UNIT_HEAD}>Unit Head</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Status</label>
+                  <select value={newStaffStatus} onChange={e => setNewStaffStatus(e.target.value as 'APPROVED' | 'PENDING')} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                    <option value="APPROVED">Approved</option>
+                    <option value="PENDING">Pending Approval</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Unit on Available Church</label>
+                <select required value={newStaffUnitId} onChange={e => setNewStaffUnitId(e.target.value)} className="w-full p-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-600">
+                  <option value="">-- Select Available Unit --</option>
+                  {availableUnits.map(u => (
+                    <option key={u.id} value={u.id}>{u.name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-slate-400 mt-1 font-medium">
+                  Showing units available for this church.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setIsAddModalOpen(false)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all">Cancel</button>
+                <button disabled={isSubmitting} type="submit" className="flex-1 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-indigo-100 transition-all active:scale-95">
+                  {isSubmitting ? 'Saving...' : 'Add To Staff Registry'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div className="space-y-1">
@@ -104,6 +241,14 @@ const Workers: React.FC = () => {
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+          <button 
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-6 py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl transition shadow-xl shadow-indigo-100 font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 active:scale-95"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M12 4v16m8-8H4"></path></svg>
+            Add Staff
+          </button>
           <button 
             type="button"
             onClick={handleCopyLink}
@@ -203,8 +348,8 @@ const Workers: React.FC = () => {
                       <p className="text-[10px] font-black text-slate-800 uppercase tracking-widest">
                         {user.role.replace('_', ' ')}
                       </p>
-                      <p className="text-[9px] text-indigo-50 font-bold uppercase">
-                        {units.find(u => u.id === user.unitId)?.name || 'General Registry'}
+                      <p className="text-[9px] text-indigo-600 font-bold uppercase tracking-wider">
+                        {units.find(u => u.id === user.unitId)?.name || DEFAULT_STAFF_UNITS.find(d => d.id === user.unitId)?.name || 'General Registry'}
                       </p>
                     </div>
                   </td>
@@ -274,8 +419,8 @@ const Workers: React.FC = () => {
                   <p className="text-[10px] font-black text-slate-800 uppercase truncate">
                     {user.role.replace('_', ' ')}
                   </p>
-                  <p className="text-[8px] text-indigo-500 font-bold uppercase">
-                    {units.find(u => u.id === user.unitId)?.name || 'General Registry'}
+                  <p className="text-[8px] text-indigo-600 font-bold uppercase">
+                    {units.find(u => u.id === user.unitId)?.name || DEFAULT_STAFF_UNITS.find(d => d.id === user.unitId)?.name || 'General Registry'}
                   </p>
                 </div>
                 <div>

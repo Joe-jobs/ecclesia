@@ -10,8 +10,21 @@ interface LoginProps {
   onBackToHome?: () => void;
 }
 
+const DEFAULT_STAFF_UNITS = [
+  { id: 'def-media', name: 'Media & IT Unit' },
+  { id: 'def-hospitality', name: 'Hospitality & Ushering Unit' },
+  { id: 'def-choir', name: 'Choir & Music Ministry' },
+  { id: 'def-protocol', name: 'Protocol & Security Unit' },
+  { id: 'def-greeters', name: 'Greeters & Sanctuary Unit' },
+  { id: 'def-children', name: 'Children Ministry' },
+  { id: 'def-youth', name: 'Youth & Student Ministry' },
+  { id: 'def-welfare', name: 'Welfare & Care Team' },
+  { id: 'def-prayer', name: 'Prayer & Intercession Unit' },
+  { id: 'def-sanitation', name: 'Sanitation & Maintenance' }
+];
+
 const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) => {
-  const { registerUser, addChurch, churches, units, users, login, resetPassword } = useApp();
+  const { registerUser, addChurch, addUnit, churches, units, users, login, resetPassword } = useApp();
   const [isSignup, setIsSignup] = useState(initialIsSignup);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isResetSent, setIsResetSent] = useState(false);
@@ -21,6 +34,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [isWorkerJoin, setIsWorkerJoin] = useState(false);
   const [targetChurchId, setTargetChurchId] = useState<string | null>(null);
+  const [selectedChurchId, setSelectedChurchId] = useState<string>('');
   const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -63,6 +77,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
         if (churchId) {
           setIsWorkerJoin(true);
           setTargetChurchId(churchId);
+          setSelectedChurchId(churchId);
           setIsSignup(true);
         }
       }
@@ -72,9 +87,15 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     return () => window.removeEventListener('hashchange', checkHashAndQuery);
   }, []);
 
-  const targetUnits = useMemo(() => 
-    targetChurchId ? units.filter(u => u.churchId === targetChurchId) : []
-  , [targetChurchId, units]);
+  // Effective Church ID
+  const effectiveChurchId = targetChurchId || selectedChurchId || (churches[0]?.id || '');
+
+  // Units available for the selected church
+  const availableChurchUnits = useMemo(() => {
+    if (!effectiveChurchId) return DEFAULT_STAFF_UNITS;
+    const filtered = units.filter(u => u.churchId === effectiveChurchId);
+    return filtered.length > 0 ? filtered : DEFAULT_STAFF_UNITS;
+  }, [effectiveChurchId, units]);
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,8 +120,12 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       setAuthError("Passwords do not match");
       return;
     }
+    if (isWorkerJoin && !effectiveChurchId) {
+      setAuthError("Please select a church.");
+      return;
+    }
     if (isWorkerJoin && !selectedUnitId) {
-      setAuthError("Please select a unit.");
+      setAuthError("Please select a unit from available church units.");
       return;
     }
 
@@ -115,14 +140,27 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
     setTimeout(async () => {
       try {
-        if (isWorkerJoin && targetChurchId) {
+        if (isWorkerJoin) {
+          let finalUnitId = selectedUnitId;
+          if (selectedUnitId.startsWith('def-')) {
+            const defItem = DEFAULT_STAFF_UNITS.find(d => d.id === selectedUnitId);
+            if (defItem) {
+              const newU = await addUnit({
+                churchId: effectiveChurchId,
+                name: defItem.name,
+                headIds: []
+              });
+              finalUnitId = newU.id;
+            }
+          }
+
           await registerUser({
-            churchId: targetChurchId,
+            churchId: effectiveChurchId,
             fullName,
             email,
             phone,
             role: UserRole.WORKER,
-            unitId: selectedUnitId,
+            unitId: finalUnitId,
             status: 'PENDING'
           });
           setIsPendingApproval(true);
@@ -151,7 +189,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
       } finally {
         setLoading(false);
       }
-    }, 800);
+    }, 500);
   };
 
   const handleForgotPassword = async (e?: React.FormEvent) => {
@@ -397,6 +435,23 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             </form>
           ) : isSignup ? (
             <form onSubmit={handleSignup} className="space-y-3">
+              <div className="flex bg-slate-100 p-1 rounded-2xl mb-2 text-[10px] font-black uppercase tracking-wider">
+                <button
+                  type="button"
+                  onClick={() => setIsWorkerJoin(false)}
+                  className={`flex-1 py-2 rounded-xl transition-all ${!isWorkerJoin ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Create New Church
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsWorkerJoin(true)}
+                  className={`flex-1 py-2 rounded-xl transition-all ${isWorkerJoin ? 'bg-white text-indigo-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Staff Registration
+                </button>
+              </div>
+
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Full Name</label>
                 <input required placeholder="John Doe" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
@@ -407,7 +462,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Email Address</label>
-                <input required type="email" placeholder="admin@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                <input required type="email" placeholder="staff@church.org" value={email} onChange={e => setEmail(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -430,12 +485,51 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                 </div>
               </div>
               {isWorkerJoin && (
-                <div>
-                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Unit</label>
-                  <select required value={selectedUnitId} onChange={e => setSelectedUnitId(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white">
-                    <option value="">Select Unit</option>
-                    {targetUnits.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
+                <div className="space-y-3 pt-1">
+                  {targetChurchId ? (
+                    <div className="bg-indigo-50/90 border border-indigo-100 rounded-2xl p-3 text-left flex items-center justify-between">
+                      <div>
+                        <span className="text-[9px] font-black uppercase text-indigo-600 tracking-wider block">Invited Staff Registration</span>
+                        <p className="text-xs font-bold text-slate-900">
+                          {churches.find(c => c.id === targetChurchId)?.name || 'Selected Church Portal'}
+                        </p>
+                      </div>
+                      <span className="text-[10px] bg-indigo-600 text-white font-black px-2.5 py-1 rounded-full uppercase tracking-wider">Church Linked</span>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Church</label>
+                      <select 
+                        required 
+                        value={selectedChurchId || effectiveChurchId} 
+                        onChange={e => { 
+                          setSelectedChurchId(e.target.value); 
+                          setSelectedUnitId(''); 
+                        }} 
+                        className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white font-medium text-slate-800"
+                      >
+                        <option value="">-- Choose Church --</option>
+                        {churches.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} {c.location ? `(${c.location})` : ''}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Select Ministry / Service Unit</label>
+                    <select 
+                      required 
+                      value={selectedUnitId} 
+                      onChange={e => setSelectedUnitId(e.target.value)} 
+                      className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none bg-white font-medium text-slate-800"
+                    >
+                      <option value="">-- Select Available Unit --</option>
+                      {availableChurchUnits.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
               )}
               {!isWorkerJoin && (
@@ -461,7 +555,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
                 </div>
               )}
               <button disabled={loading} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl uppercase text-xs tracking-wider hover:bg-indigo-700 transition-colors mt-2">
-                {loading ? 'Processing...' : 'Register Portal'}
+                {loading ? 'Processing...' : isWorkerJoin ? 'Register as Staff' : 'Register Portal'}
               </button>
             </form>
           ) : (
