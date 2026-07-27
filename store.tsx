@@ -30,7 +30,7 @@ interface AppState {
 }
 
 interface AppContextProps extends AppState {
-  login: (email: string, password?: string) => void;
+  login: (email: string, password?: string, directUser?: User, directChurch?: Church | null) => void;
   logout: () => void;
   registerUser: (user: Omit<User, 'id'>, customId?: string) => Promise<User>;
   addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location' | 'status'>) => Promise<Church>;
@@ -67,10 +67,28 @@ interface AppContextProps extends AppState {
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
+const getSavedUser = (): User | null => {
+  try {
+    const saved = localStorage.getItem('demo_user');
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const getSavedChurch = (): Church | null => {
+  try {
+    const saved = localStorage.getItem('demo_church');
+    return saved ? JSON.parse(saved) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [state, setState] = useState<AppState>({
-    currentUser: null,
-    currentChurch: null,
+    currentUser: getSavedUser(),
+    currentChurch: getSavedChurch(),
     churches: [],
     users: Mocks.MOCK_USERS as User[],
     units: Mocks.MOCK_UNITS as Unit[],
@@ -93,7 +111,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       const churchesCol = collection(db, 'churches');
       unsubscribeChurches = onSnapshot(churchesCol, (snapshot) => {
         const fsChurches: Church[] = snapshot.docs.map(doc => doc.data() as Church);
-        setState(prev => ({ ...prev, churches: fsChurches }));
+        setState(prev => {
+          let updatedChurch = prev.currentChurch;
+          if (prev.currentUser?.churchId) {
+            const found = fsChurches.find(c => c.id === prev.currentUser?.churchId);
+            if (found) {
+              updatedChurch = found;
+              localStorage.setItem('demo_church', JSON.stringify(found));
+            }
+          }
+          return { ...prev, churches: fsChurches, currentChurch: updatedChurch };
+        });
       }, (err) => console.warn('Firestore churches snapshot warning:', err));
 
       const usersCol = collection(db, 'users');
@@ -102,8 +130,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const fsUsers: User[] = snapshot.docs.map(doc => doc.data() as User);
           setState(prev => {
             const existingIds = new Set(fsUsers.map(u => u.id));
-            const merged = [...fsUsers, ...prev.users.filter(u => !existingIds.has(u.id))];
-            return { ...prev, users: merged };
+            const mergedUsers = [...fsUsers, ...prev.users.filter(u => !existingIds.has(u.id))];
+            let updatedUser = prev.currentUser;
+            const savedEmail = localStorage.getItem('demo_email');
+            if (savedEmail) {
+              const found = mergedUsers.find(u => u.email.toLowerCase() === savedEmail.toLowerCase());
+              if (found) {
+                updatedUser = found;
+                localStorage.setItem('demo_user', JSON.stringify(found));
+              }
+            }
+            return { ...prev, users: mergedUsers, currentUser: updatedUser };
           });
         }
       }, (err) => console.warn('Firestore users snapshot warning:', err));
@@ -118,33 +155,54 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
   }, []);
 
-  // Load user on mount if they have an active session
+  // Sync user on mount if email exists but currentUser wasn't initialized
   React.useEffect(() => {
     const savedEmail = localStorage.getItem('demo_email');
     if (savedEmail && !state.currentUser) {
       try {
         login(savedEmail);
       } catch (e) {
-        localStorage.removeItem('demo_email');
+        // keep session intact until firestore finishes loading users
       }
     }
   }, [state.users]);
 
-  const login = (email: string, password?: string) => {
-    // Demo login: allow any email from the mock user list
-    const user = state.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const login = (email: string, password?: string, directUser?: User, directChurch?: Church | null) => {
+    // Find user from state or directUser passed during registration
+    const user = directUser || state.users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (user) {
-      const church = state.churches.find(c => c.id === user.churchId) || null;
+      const church = directChurch !== undefined 
+        ? directChurch 
+        : (state.churches.find(c => c.id === user.churchId) || null);
       const updatedUser = { ...user, lastLogin: new Date().toLocaleString() };
       
       localStorage.setItem('demo_email', email);
+      localStorage.setItem('demo_user', JSON.stringify(updatedUser));
+      if (church) {
+        localStorage.setItem('demo_church', JSON.stringify(church));
+      } else {
+        localStorage.removeItem('demo_church');
+      }
       
-      setState(prev => ({ 
-        ...prev, 
-        currentUser: updatedUser, 
-        currentChurch: church,
-        users: prev.users.map(u => u.id === user.id ? updatedUser : u)
-      }));
+      setState(prev => {
+        const userExists = prev.users.some(u => u.id === user.id);
+        const updatedUsers = userExists 
+          ? prev.users.map(u => u.id === user.id ? updatedUser : u)
+          : [...prev.users, updatedUser];
+
+        const churchExists = church ? prev.churches.some(c => c.id === church.id) : false;
+        const updatedChurches = (church && !churchExists)
+          ? [...prev.churches, church]
+          : prev.churches;
+
+        return { 
+          ...prev, 
+          currentUser: updatedUser, 
+          currentChurch: church,
+          users: updatedUsers,
+          churches: updatedChurches
+        };
+      });
     } else {
       throw new Error("Demo Account Not Found");
     }
@@ -152,10 +210,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
   const logout = () => {
     localStorage.removeItem('demo_email');
+    localStorage.removeItem('demo_user');
+    localStorage.removeItem('demo_church');
     setState(prev => ({ ...prev, currentUser: null, currentChurch: null }));
   };
 
   const setCurrentUser = (user: User | null) => {
+    if (user) {
+      localStorage.setItem('demo_user', JSON.stringify(user));
+      localStorage.setItem('demo_email', user.email);
+    } else {
+      localStorage.removeItem('demo_user');
+      localStorage.removeItem('demo_email');
+    }
     setState(prev => ({ ...prev, currentUser: user }));
   };
 
@@ -206,11 +273,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
     setState(prev => ({ ...prev, churches: [], currentChurch: null }));
   };
-
-  // Immediate execution of purge on load as explicitly requested by user
-  useEffect(() => {
-    deleteAllChurches();
-  }, []);
 
   const toggleChurchStatus = async (churchId: string) => {
     const updatedStatus = state.churches.find(c => c.id === churchId)?.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';

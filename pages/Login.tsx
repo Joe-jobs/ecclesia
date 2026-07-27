@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useApp } from '../store.tsx';
 import { UserRole, User } from '../types.ts';
 
@@ -21,6 +22,8 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
@@ -110,7 +113,7 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             phone,
             adminId: 'simulated-uid'
           });
-          await registerUser({
+          const newUser = await registerUser({
             churchId: church.id,
             fullName,
             email,
@@ -118,8 +121,8 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
             role: UserRole.CHURCH_ADMIN,
             status: 'APPROVED'
           });
-          // Auto-login after registration
-          login(email, password);
+          // Auto-login after registration with created user & church
+          login(email, password, newUser, church);
         }
       } catch (error: any) {
         setAuthError("Registration failed.");
@@ -212,11 +215,21 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
-                  <input required type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                  <div className="relative">
+                    <input required type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-2.5 pr-9 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Confirm</label>
-                  <input required type="password" placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-2.5 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                  <div className="relative">
+                    <input required type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••••" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="w-full p-2.5 pr-9 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                    <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
                 </div>
               </div>
               {isWorkerJoin && (
@@ -262,7 +275,12 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Password</label>
-                <input required type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                <div className="relative">
+                  <input required type={showPassword ? 'text' : 'password'} placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} className="w-full p-3 pr-10 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-600 focus:outline-none" />
+                  <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none">
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div className="flex justify-end">
                  <button type="button" onClick={() => setIsForgotPassword(true)} className="text-xs font-bold text-indigo-600 hover:underline">Forgot Password?</button>
