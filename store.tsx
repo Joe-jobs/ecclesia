@@ -252,6 +252,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (err) {
       console.error('Error deleting church from Firestore:', err);
     }
+    if (state.currentChurch?.id === churchId) {
+      localStorage.removeItem('demo_church');
+    }
     setState(prev => ({
       ...prev,
       churches: prev.churches.filter(c => c.id !== churchId),
@@ -272,6 +275,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     } catch (err) {
       console.error('Error deleting all churches from Firestore:', err);
     }
+    localStorage.removeItem('demo_church');
     setState(prev => ({ ...prev, churches: [], currentChurch: null }));
   };
 
