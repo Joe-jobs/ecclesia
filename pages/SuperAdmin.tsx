@@ -2,11 +2,17 @@ import React from 'react';
 import { useApp } from '../store.tsx';
 
 const SuperAdmin: React.FC = () => {
-  const { churches, users, attendance, firstTimers } = useApp();
+  const { churches, users, attendance, firstTimers, deleteChurch, deleteAllChurches } = useApp();
 
   const totalUsers = users.length;
   const totalEntries = attendance.length;
   const totalFirstTimers = firstTimers.length;
+
+  const handleDeleteAll = async () => {
+    if (window.confirm('Are you sure you want to delete ALL church records from the database? This action cannot be undone.')) {
+      await deleteAllChurches();
+    }
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -36,7 +42,17 @@ const SuperAdmin: React.FC = () => {
             <h3 className="text-lg font-black text-slate-800 tracking-tight">Church Registration Registry</h3>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Master Tenant List</p>
           </div>
-          <div className="bg-emerald-50 text-emerald-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">System Online</div>
+          <div className="flex items-center gap-3">
+            {churches.length > 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider"
+              >
+                🗑️ Delete All Churches
+              </button>
+            )}
+            <div className="bg-emerald-50 text-emerald-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest">System Online</div>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left">
@@ -46,7 +62,8 @@ const SuperAdmin: React.FC = () => {
                 <th className="px-8 py-5">Location</th>
                 <th className="px-8 py-5 text-center">Lifecycle Status</th>
                 <th className="px-8 py-5">Admin Email</th>
-                <th className="px-8 py-5 text-right">Onboarding Date</th>
+                <th className="px-8 py-5">Onboarding Date</th>
+                <th className="px-8 py-5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -70,8 +87,16 @@ const SuperAdmin: React.FC = () => {
                     <td className="px-8 py-5">
                       <p className="text-xs font-bold text-indigo-600 tracking-tight lowercase">{admin?.email || 'No Admin Linked'}</p>
                     </td>
-                    <td className="px-8 py-5 text-right">
+                    <td className="px-8 py-5">
                       <p className="text-xs font-bold text-slate-500">{church.createdAt}</p>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button
+                        onClick={() => deleteChurch(church.id)}
+                        className="text-xs font-bold text-rose-500 hover:text-rose-700 hover:underline"
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 );
@@ -81,8 +106,9 @@ const SuperAdmin: React.FC = () => {
         </div>
         
         {churches.length === 0 && (
-          <div className="py-20 text-center">
+          <div className="py-20 text-center space-y-2">
             <p className="text-slate-400 font-black text-xs uppercase tracking-widest">No churches registered in the platform vault.</p>
+            <p className="text-slate-400 text-xs font-medium">All church records have been cleared from Firestore.</p>
           </div>
         )}
       </div>

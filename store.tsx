@@ -1,9 +1,11 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { 
   User, Church, Unit, FirstTimer, AttendanceRecord, ActionPlan, 
   Announcement, Property, ChurchEvent, UserRole, Transaction, Budget, Currency 
 } from './types.ts';
 import * as Mocks from './mockData.ts';
+import { db } from './firebase.ts';
+import { collection, onSnapshot, setDoc, doc, getDocs, deleteDoc, writeBatch } from 'firebase/firestore';
 
 export const EXCHANGE_RATES: Record<Currency, number> = {
   [Currency.USD]: 1,
@@ -32,6 +34,8 @@ interface AppContextProps extends AppState {
   logout: () => void;
   registerUser: (user: Omit<User, 'id'>, customId?: string) => Promise<User>;
   addChurch: (church: Omit<Church, 'id' | 'createdAt' | 'location' | 'status'>) => Promise<Church>;
+  deleteChurch: (churchId: string) => Promise<void>;
+  deleteAllChurches: () => Promise<void>;
   setCurrentChurchId: (id: string) => void;
   updateUser: (user: Partial<User>) => Promise<void>;
   approveUser: (userId: string) => Promise<void>;
@@ -67,7 +71,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const [state, setState] = useState<AppState>({
     currentUser: null,
     currentChurch: null,
-    churches: Mocks.MOCK_CHURCHES as Church[],
+    churches: [],
     users: Mocks.MOCK_USERS as User[],
     units: Mocks.MOCK_UNITS as Unit[],
     firstTimers: Mocks.MOCK_FIRST_TIMERS as FirstTimer[],
@@ -79,6 +83,40 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     transactions: [],
     budgets: [],
   });
+
+  // Sync Churches and Users with Firestore
+  useEffect(() => {
+    let unsubscribeChurches: (() => void) | null = null;
+    let unsubscribeUsers: (() => void) | null = null;
+
+    try {
+      const churchesCol = collection(db, 'churches');
+      unsubscribeChurches = onSnapshot(churchesCol, (snapshot) => {
+        const fsChurches: Church[] = snapshot.docs.map(doc => doc.data() as Church);
+        setState(prev => ({ ...prev, churches: fsChurches }));
+      }, (err) => console.warn('Firestore churches snapshot warning:', err));
+
+      const usersCol = collection(db, 'users');
+      unsubscribeUsers = onSnapshot(usersCol, (snapshot) => {
+        if (!snapshot.empty) {
+          const fsUsers: User[] = snapshot.docs.map(doc => doc.data() as User);
+          setState(prev => {
+            const existingIds = new Set(fsUsers.map(u => u.id));
+            const merged = [...fsUsers, ...prev.users.filter(u => !existingIds.has(u.id))];
+            return { ...prev, users: merged };
+          });
+        }
+      }, (err) => console.warn('Firestore users snapshot warning:', err));
+
+    } catch (err) {
+      console.warn('Firestore sync failed, falling back to local state:', err);
+    }
+
+    return () => {
+      if (unsubscribeChurches) unsubscribeChurches();
+      if (unsubscribeUsers) unsubscribeUsers();
+    };
+  }, []);
 
   // Load user on mount if they have an active session
   React.useEffect(() => {
@@ -131,20 +169,70 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       currency: Currency.USD,
       status: 'ACTIVE'
     };
+    try {
+      await setDoc(doc(db, 'churches', churchId), newChurch);
+    } catch (err) {
+      console.error('Error saving church to Firestore:', err);
+    }
     setState(prev => ({ ...prev, churches: [...prev.churches, newChurch] }));
     return newChurch;
   };
 
-  const toggleChurchStatus = async (churchId: string) => {
+  const deleteChurch = async (churchId: string) => {
+    try {
+      await deleteDoc(doc(db, 'churches', churchId));
+    } catch (err) {
+      console.error('Error deleting church from Firestore:', err);
+    }
     setState(prev => ({
       ...prev,
-      churches: prev.churches.map(c => c.id === churchId ? { ...c, status: c.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' } : c)
+      churches: prev.churches.filter(c => c.id !== churchId),
+      currentChurch: prev.currentChurch?.id === churchId ? null : prev.currentChurch
+    }));
+  };
+
+  const deleteAllChurches = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'churches'));
+      if (!querySnapshot.empty) {
+        const batch = writeBatch(db);
+        querySnapshot.forEach((docSnap) => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+      }
+    } catch (err) {
+      console.error('Error deleting all churches from Firestore:', err);
+    }
+    setState(prev => ({ ...prev, churches: [], currentChurch: null }));
+  };
+
+  // Immediate execution of purge on load as explicitly requested by user
+  useEffect(() => {
+    deleteAllChurches();
+  }, []);
+
+  const toggleChurchStatus = async (churchId: string) => {
+    const updatedStatus = state.churches.find(c => c.id === churchId)?.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    try {
+      await setDoc(doc(db, 'churches', churchId), { status: updatedStatus }, { merge: true });
+    } catch (err) {
+      console.error('Error updating church status in Firestore:', err);
+    }
+    setState(prev => ({
+      ...prev,
+      churches: prev.churches.map(c => c.id === churchId ? { ...c, status: updatedStatus } : c)
     }));
   };
 
   const registerUser = async (userData: Omit<User, 'id'>, customId?: string) => {
     const id = customId || 'u-' + Math.random().toString(36).substring(2, 11);
     const newUser: User = { ...userData, id };
+    try {
+      await setDoc(doc(db, 'users', id), newUser);
+    } catch (err) {
+      console.error('Error saving user to Firestore:', err);
+    }
     setState(prev => ({ ...prev, users: [...prev.users, newUser] }));
     return newUser;
   };
@@ -319,6 +407,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       logout, 
       registerUser,
       addChurch,
+      deleteChurch,
+      deleteAllChurches,
       setCurrentChurchId, 
       updateUser, 
       approveUser, 
