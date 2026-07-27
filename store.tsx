@@ -103,10 +103,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     budgets: [],
   });
 
-  // Sync Churches and Users with Firestore
+  // Sync Churches, Users, and Units with Firestore
   useEffect(() => {
     let unsubscribeChurches: (() => void) | null = null;
     let unsubscribeUsers: (() => void) | null = null;
+    let unsubscribeUnits: (() => void) | null = null;
 
     try {
       const churchesCol = collection(db, 'churches');
@@ -146,6 +147,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
       }, (err) => console.warn('Firestore users snapshot warning:', err));
 
+      const unitsCol = collection(db, 'units');
+      unsubscribeUnits = onSnapshot(unitsCol, (snapshot) => {
+        if (!snapshot.empty) {
+          const fsUnits: Unit[] = snapshot.docs.map(doc => doc.data() as Unit);
+          setState(prev => {
+            const existingIds = new Set(fsUnits.map(u => u.id));
+            const mergedUnits = [...fsUnits, ...prev.units.filter(u => !existingIds.has(u.id))];
+            return { ...prev, units: mergedUnits };
+          });
+        }
+      }, (err) => console.warn('Firestore units snapshot warning:', err));
+
     } catch (err) {
       console.warn('Firestore sync failed, falling back to local state:', err);
     }
@@ -153,6 +166,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     return () => {
       if (unsubscribeChurches) unsubscribeChurches();
       if (unsubscribeUsers) unsubscribeUsers();
+      if (unsubscribeUnits) unsubscribeUnits();
     };
   }, []);
 
@@ -365,6 +379,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const updateUnit = async (id: string, updates: Partial<Unit>) => {
+    try {
+      const existing = state.units.find(u => u.id === id);
+      if (existing) {
+        await setDoc(doc(db, 'units', id), { ...existing, ...updates }, { merge: true });
+      } else {
+        await setDoc(doc(db, 'units', id), updates, { merge: true });
+      }
+    } catch (err) {
+      console.error('Error updating unit in Firestore:', err);
+    }
     setState(prev => ({
       ...prev,
       units: prev.units.map(u => u.id === id ? { ...u, ...updates } : u)
@@ -372,6 +396,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   };
 
   const deleteUnit = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'units', id));
+    } catch (err) {
+      console.error('Error deleting unit from Firestore:', err);
+    }
     setState(prev => ({
       ...prev,
       units: prev.units.filter(u => u.id !== id)
