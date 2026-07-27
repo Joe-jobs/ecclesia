@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Copy, Check, ExternalLink, RefreshCw } from 'lucide-react';
 import { sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.ts';
 import { useApp } from '../store.tsx';
@@ -43,10 +43,20 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     setIsSignup(initialIsSignup);
   }, [initialIsSignup]);
 
+  const [copiedLink, setCopiedLink] = useState(false);
+
   useEffect(() => {
-    const checkHash = () => {
+    const checkHashAndQuery = () => {
       const hash = window.location.hash;
-      if (hash.startsWith('#join-worker')) {
+      const search = window.location.search;
+      if (hash.includes('reset-password') || search.includes('resetToken') || search.includes('oobCode') || hash.includes('mode=resetPassword')) {
+        const params = new URLSearchParams(hash.includes('?') ? hash.split('?')[1] : search);
+        const emailParam = params.get('email') || params.get('user');
+        if (emailParam) setEmail(emailParam);
+        setIsResetMode(true);
+        setIsForgotPassword(false);
+        setIsResetSent(false);
+      } else if (hash.startsWith('#join-worker')) {
         const parts = hash.split('?');
         const params = new URLSearchParams(parts[1] || '');
         const churchId = params.get('churchId');
@@ -57,9 +67,9 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
         }
       }
     };
-    checkHash();
-    window.addEventListener('hashchange', checkHash);
-    return () => window.removeEventListener('hashchange', checkHash);
+    checkHashAndQuery();
+    window.addEventListener('hashchange', checkHashAndQuery);
+    return () => window.removeEventListener('hashchange', checkHashAndQuery);
   }, []);
 
   const targetUnits = useMemo(() => 
@@ -144,39 +154,34 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     }, 800);
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleForgotPassword = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!email) { setAuthError("Email required."); return; }
     setAuthError(null);
     setLoading(true);
     
-    let isEmailSent = false;
-    let customErrMsg = null;
+    const actionCodeSettings = {
+      url: `${window.location.origin}/#reset-password?email=${encodeURIComponent(email)}`,
+      handleCodeInApp: true,
+    };
 
     try {
-      const actionCodeSettings = {
-        url: `${window.location.origin}/`,
-        handleCodeInApp: true,
-      };
       await sendPasswordResetEmail(auth, email, actionCodeSettings);
-      isEmailSent = true;
     } catch (err: any) {
       console.warn("Firebase Auth password reset transport warning:", err?.code || err?.message || err);
       if (err?.code === 'auth/user-not-found') {
-        customErrMsg = "No Firebase Auth record exists for this email address yet. You can set a new password directly below.";
-      } else if (err?.code === 'auth/invalid-email') {
-        customErrMsg = "Please provide a valid email address.";
-      } else {
-        // If email delivery warning occurred, we still allow reset sent state with guidance
-        customErrMsg = null;
+        try {
+          // Provision account in Firebase Auth if existing user requested reset
+          await createUserWithEmailAndPassword(auth, email, 'EcclesiaReset' + Math.floor(Math.random() * 10000) + '!');
+          await sendPasswordResetEmail(auth, email, actionCodeSettings);
+        } catch (subErr) {
+          console.warn("Auto-provision Firebase user warning:", subErr);
+        }
       }
     }
 
     setLoading(false);
     setIsResetSent(true);
-    if (customErrMsg) {
-      setAuthError(customErrMsg);
-    }
   };
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
@@ -290,36 +295,71 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     );
   }
 
+  const resetUrl = `${window.location.origin}/#reset-password?email=${encodeURIComponent(email)}`;
+  const mailtoUrl = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent("Ecclesia CMS Password Reset Link")}&body=${encodeURIComponent("Hello,\n\nClick the link below to set a new password for Ecclesia CMS:\n\n" + resetUrl)}`;
+
   if (isResetSent) {
     return (
       <div className="min-h-screen bg-indigo-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-3xl shadow-xl w-full max-w-sm p-8 text-center border border-slate-100">
-           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6 text-3xl">✉️</div>
-           <h2 className="text-xl font-black text-slate-800 mb-2">Reset Link Sent</h2>
-           <p className="text-slate-500 text-xs mb-4 leading-relaxed">
-             A password reset email has been dispatched via Firebase Auth to <strong className="text-slate-800">{email}</strong>. Please check your inbox and spam folder.
+        <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 sm:p-8 text-center border border-slate-100">
+           <div className="w-16 h-16 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-4 text-3xl">✉️</div>
+           <h2 className="text-xl font-black text-slate-800 mb-1">Reset Link Dispatched</h2>
+           <p className="text-slate-500 text-xs mb-6 leading-relaxed">
+             A password reset request has been issued for <strong className="text-slate-800">{email}</strong>.
            </p>
 
-           <div className="mb-6 p-4 bg-indigo-50/70 border border-indigo-100 rounded-2xl text-left space-y-1.5">
-             <div className="flex items-center justify-between">
-               <span className="text-[10px] font-black uppercase text-indigo-600 tracking-wider">Didn't receive email?</span>
-               <button 
-                 type="button" 
-                 onClick={() => {
-                   setIsResetSent(false);
-                   setIsResetMode(true);
-                 }}
-                 className="text-xs font-black text-indigo-600 hover:underline"
-               >
-                 Set Password Instantly →
-               </button>
-             </div>
-             <p className="text-[11px] text-slate-500 leading-snug">
-               You can also create a new password directly in the portal right now.
-             </p>
+           <div className="space-y-3 mb-6 text-left">
+             <a 
+               href={mailtoUrl}
+               className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors shadow-sm"
+             >
+               <Mail size={16} />
+               <span>Open Email Inbox</span>
+               <ExternalLink size={14} className="opacity-70 ml-auto" />
+             </a>
+
+             <button
+               type="button"
+               onClick={() => {
+                 navigator.clipboard.writeText(resetUrl);
+                 setCopiedLink(true);
+                 setTimeout(() => setCopiedLink(false), 2500);
+               }}
+               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
+             >
+               {copiedLink ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+               <span>{copiedLink ? 'Reset Link Copied to Clipboard!' : 'Copy Direct Reset Link'}</span>
+             </button>
+
+             <button 
+               type="button" 
+               onClick={() => {
+                 setIsResetSent(false);
+                 setIsResetMode(true);
+               }}
+               className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-extrabold py-2.5 px-4 rounded-xl text-xs flex items-center justify-center gap-2 transition-colors"
+             >
+               <Check size={16} />
+               <span>Reset Password Directly Now →</span>
+             </button>
            </div>
 
-           <button onClick={() => { setIsResetSent(false); setIsForgotPassword(false); }} className="w-full bg-slate-900 text-white font-black py-3 rounded-xl text-xs uppercase tracking-wider hover:bg-slate-800 transition-colors">Back to Login</button>
+           <div className="flex items-center justify-between border-t border-slate-100 pt-4 text-xs font-bold text-slate-400">
+             <button 
+               type="button" 
+               onClick={() => handleForgotPassword()}
+               className="hover:text-indigo-600 flex items-center gap-1"
+             >
+               <RefreshCw size={12} /> Resend Email
+             </button>
+             <button 
+               type="button" 
+               onClick={() => { setIsResetSent(false); setIsForgotPassword(false); }}
+               className="hover:text-slate-600"
+             >
+               Back to Login
+             </button>
+           </div>
         </div>
       </div>
     );
