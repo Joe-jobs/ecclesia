@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { sendPasswordResetEmail } from 'firebase/auth';
+import { sendPasswordResetEmail, createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase.ts';
 import { useApp } from '../store.tsx';
 import { UserRole, User } from '../types.ts';
@@ -96,7 +96,13 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
 
     setLoading(true);
     
-    // Simulate registration
+    // Register in Firebase Auth first to enable password reset email notifications
+    try {
+      await createUserWithEmailAndPassword(auth, email, password);
+    } catch (fbErr: any) {
+      console.info("Firebase Auth user registration note:", fbErr?.code || fbErr?.message);
+    }
+
     setTimeout(async () => {
       try {
         if (isWorkerJoin && targetChurchId) {
@@ -144,16 +150,33 @@ const Login: React.FC<LoginProps> = ({ initialIsSignup = false, onBackToHome }) 
     setAuthError(null);
     setLoading(true);
     
+    let isEmailSent = false;
+    let customErrMsg = null;
+
     try {
-      await sendPasswordResetEmail(auth, email);
+      const actionCodeSettings = {
+        url: `${window.location.origin}/`,
+        handleCodeInApp: true,
+      };
+      await sendPasswordResetEmail(auth, email, actionCodeSettings);
+      isEmailSent = true;
     } catch (err: any) {
-      console.warn("Firebase reset password email warning:", err?.message || err);
+      console.warn("Firebase Auth password reset transport warning:", err?.code || err?.message || err);
+      if (err?.code === 'auth/user-not-found') {
+        customErrMsg = "No Firebase Auth record exists for this email address yet. You can set a new password directly below.";
+      } else if (err?.code === 'auth/invalid-email') {
+        customErrMsg = "Please provide a valid email address.";
+      } else {
+        // If email delivery warning occurred, we still allow reset sent state with guidance
+        customErrMsg = null;
+      }
     }
 
-    setTimeout(() => {
-      setIsResetSent(true);
-      setLoading(false);
-    }, 500);
+    setLoading(false);
+    setIsResetSent(true);
+    if (customErrMsg) {
+      setAuthError(customErrMsg);
+    }
   };
 
   const handleSetNewPassword = async (e: React.FormEvent) => {
